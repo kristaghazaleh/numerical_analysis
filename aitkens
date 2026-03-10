@@ -1,0 +1,50 @@
+format long e
+clc
+
+x0 = 3;
+root_exact = 2;
+
+f  = @(x) -8 + x.*(12 + (-6 + x).*x);
+fp = @(x) 3*x.^2 - 12*x + 12;
+
+[xA, xhatA] = newton_and_aitken(f, fp, x0);
+fprintf('Part (a)\n');
+fprintf('Newton:  x1=%.16e  x2=%.16e  x3=%.16e  x4=%.16e\n', xA(2), xA(3), xA(4), xA(5));
+fprintf('Aitken:  xhat1=%.16e xhat2=%.16e xhat3=%.16e xhat4=%.16e\n', xhatA(1), xhatA(2), xhatA(3), xhatA(4));
+fprintf('RelErr:  Newton=%.16e  Aitken=%.16e\n\n', abs(xA(5)-root_exact)/abs(root_exact), abs(xhatA(4)-root_exact)/abs(root_exact));
+
+f  = @(x) -2 + x.*(-1 + (-1 + x).*x);
+fp = @(x) 3*x.^2 - 2*x - 1;
+
+[xB, xhatB] = newton_and_aitken(f, fp, x0);
+fprintf('Part (b)\n');
+fprintf('Newton:  x1=%.16e  x2=%.16e  x3=%.16e  x4=%.16e\n', xB(2), xB(3), xB(4), xB(5));
+fprintf('Aitken:  xhat1=%.16e xhat2=%.16e xhat3=%.16e xhat4=%.16e\n', xhatB(1), xhatB(2), xhatB(3), xhatB(4));
+fprintf('RelErr:  Newton=%.16e  Aitken=%.16e\n', abs(xB(5)-root_exact)/abs(root_exact), abs(xhatB(4)-root_exact)/abs(root_exact));
+
+function [x, xhat] = newton_and_aitken(f_handle, fp_handle, start_x)
+    x = zeros(1,6);
+    x(1) = start_x;
+    
+    for k = 1:5
+        fx  = f_handle(x(k));
+        fpx = fp_handle(x(k));
+        if fpx == 0
+            error('Newton failed: f''(x)=0 at step %d (x=%.16e).', k-1, x(k));
+        end
+        x(k+1) = x(k) - fx / fpx;
+    end
+    
+    xhat = zeros(1,4);
+    for n = 1:4
+        x0 = x(n);
+        x1 = x(n+1);
+        x2 = x(n+2);
+        denom = x2 - 2*x1 + x0;
+        if denom == 0
+            error('Aitken failed: zero denominator at n=%d.', n);
+        end
+        xhat(n) = x0 - (x1 - x0)^2 / denom;
+    end
+end
+
