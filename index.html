@@ -52,31 +52,19 @@
     </div>
   </nav>
 
-  <main class="page">
+  
+<main class="page">
 
     <section id="Introduction" class="content">
       <h2>Introduction</h2>
       <p>
-        This page collects the first main block of Math 128A into one place. The goal is to keep the key statements,
-        formulas, proof patterns, and computational habits close together so the course reads as one connected subject
-        instead of a pile of isolated techniques. Numerical analysis is mostly about three recurring questions:
-        what the exact mathematics says, what finite precision changes, and how fast a method improves an approximation.
+        Numerical analysis studies how exact mathematical problems are turned into computable procedures, what kinds of error are introduced in that process, and whether those errors shrink or grow as the computation continues. The subject is never just about getting a number. It is about understanding why a method works, what assumptions it needs, and how finite precision changes the picture.
       </p>
       <p>
-        The material on this page centers on five themes. First, local calculus facts such as Taylor expansion,
-        Rolle’s theorem, and the Mean Value Theorem are the tools used to justify numerical methods. Second,
-        floating-point arithmetic explains why perfectly reasonable algebraic formulas can behave badly on a machine.
-        Third, rootfinding methods compare robustness versus speed. Fourth, matrix factorizations explain how linear
-        systems should actually be solved in practice. Fifth, interpolation builds explicit approximating polynomials
-        and controls their error.
+        Nearly every topic on this page can be read through the same chain of questions. What is the exact target? What approximation is being produced? What quantity measures the discrepancy? What theorem controls that discrepancy? What happens to the discrepancy after one more step? That basic cycle is what ties together convergence, floating-point error, rootfinding, elimination, conditioning, and interpolation.
       </p>
       <p>
-        A practical way to read the whole subject is this: start with a mathematical target, replace it by a computable
-        iteration or factorization, track what error is introduced at each stage, and then ask whether later steps shrink
-        that error, preserve it, or magnify it. That same cycle appears in essentially every topic on this page. In rootfinding,
-        the current iterate creates the next one and the key question is whether the new error is smaller than the old one.
-        In linear systems, elimination creates roundoff and the key question is whether the matrix and algorithm amplify it.
-        In interpolation, the data are exact only at the nodes and the key question is how the off-node error behaves.
+        In this course, theorems matter because they tell you when a method is valid, not just how to run it. Definitions matter because many exam questions are really testing whether you can identify the right object: sequence, limit, relative error, condition number, simple root, subordinate norm, residual, divided difference, interpolation error, and so on. The page below is organized around those objects first and the algorithms second.
       </p>
       <div class="divider"></div>
     </section>
@@ -84,68 +72,68 @@
     <section id="Foundations" class="content">
       <h2>Foundations</h2>
 
-      <h3>Calculus facts that keep showing up</h3>
+      <h3>Core definitions</h3>
       <p>
-        Taylor expansion is the main local approximation tool. Around a point \(c\),
+        A <strong>sequence</strong> is a function from the positive integers into the real numbers, usually written as \((x_n)=(x_1,x_2,x_3,\dots)\). A sequence <strong>converges</strong> to \(x\) if for every \(\varepsilon&gt;0\) there exists an integer \(N\) such that whenever \(n&gt;N\), we have \(|x_n-x|&lt;\varepsilon\). This is the full epsilon-definition of limit, and it is the foundation under every later convergence claim.
+      </p>
+      <p>
+        The <strong>error</strong> in an approximation \(x_n\) to an exact target \(x\) is often denoted by \(e_n=x_n-x\). In rootfinding problems the exact target is typically a root \(r\), so \(e_n=x_n-r\). In many proofs the sequence itself is less important than the recurrence satisfied by the errors.
+      </p>
+      <p>
+        A root \(r\) of \(f\) is called a <strong>simple root</strong> if \(f(r)=0\) and \(f'(r)\neq 0\). Simple roots matter because Newton and secant error theorems are typically stated for them. A root of multiplicity greater than one behaves differently and often destroys the faster convergence rate.
+      </p>
+
+      <h3>Convergence-rate definitions</h3>
+      <p>
+        A sequence \((x_n)\) converging to \(x\) has <strong>linear convergence</strong> if there is a constant \(C\) with \(0&lt;C&lt;1\) such that for all sufficiently large \(n\),
         \[
-          f(x)=\sum_{k=0}^{n} \frac{f^{(k)}(c)}{k!}(x-c)^k + E_n(x),
+          |x_{n+1}-x|\le C|x_n-x|.
         \]
-        and in the Lagrange form of the remainder,
+        It has <strong>superlinear convergence</strong> if there are numbers \(\omega_n\to 0\) with
         \[
-          E_n(x)=\frac{f^{(n+1)}(\xi)}{(n+1)!}(x-c)^{n+1}
+          |x_{n+1}-x|\le \omega_n |x_n-x|
         \]
-        for some \(\xi\) between \(c\) and \(x\). The same statement can be written with \(h\) as
-        \(f(x+h)=\sum_{k=0}^n f^{(k)}(x)h^k/k! + E_n(h)\). This is the cleanest way to explain truncation error,
-        Newton’s method, and interpolation error.
+        for all large \(n\). It has <strong>quadratic convergence</strong> if there is a constant \(C&gt;0\) such that
+        \[
+          |x_{n+1}-x|\le C|x_n-x|^2
+        \]
+        for all large \(n\). More generally, convergence has <strong>order</strong> \(\alpha&gt;1\) if the next error behaves like a constant times the current error raised to the power \(\alpha\).
       </p>
       <p>
-        Rolle’s theorem and the Mean Value Theorem are the standard bridge from exact roots to derivative information.
-        They are what justify statements like “there is a point between these two values where the derivative has this value,”
-        and that is exactly the kind of sentence that appears in convergence proofs.
+        Practically, linear convergence means the error shrinks by roughly a fixed factor each step. Quadratic convergence means the method enters a regime where the number of correct digits typically grows very rapidly because the new error is approximately proportional to the square of the old one.
       </p>
 
-      <h3>Convergence language</h3>
+      <h3>Big-Oh language</h3>
       <p>
-        If \(x_n \to x\), then the error is usually written as \(e_n=x_n-x\). A method has at least linear convergence if
-        \(|e_{n+1}|\le C|e_n|\) for large \(n\) with some constant \(0&lt;C&lt;1\). It has superlinear convergence if
-        \(|e_{n+1}|\le \omega_n |e_n|\) with \(\omega_n\to 0\). It has quadratic convergence if
-        \(|e_{n+1}|\le C|e_n|^2\) for large \(n\). More generally, order \(\alpha\) means
-        \(|e_{n+1}|\le C|e_n|^{\alpha}\).
-      </p>
-      <p>
-        The practical meaning is simple. Linear convergence removes error steadily but not dramatically. Quadratic convergence
-        is the “digits start doubling” regime. Superlinear is in between. Sublinear means the sequence still converges,
-        but the improvement per step is weak.
+        Writing \(x_n = O(\omega_n)\) means there exists a constant \(C&gt;0\) and an index \(N\) such that \(|x_n|\le C|\omega_n|\) whenever \(n&gt;N\). This is a boundedness statement used to compress asymptotic formulas, especially after Taylor expansion.
       </p>
 
-      <h3>Big-Oh notation</h3>
+      <h3>The calculus facts used everywhere</h3>
       <p>
-        Writing \(x_n = O(\omega_n)\) means there is a constant \(C&gt;0\) such that \(|x_n|\le C|\omega_n|\) for all large \(n\).
-        This is a boundedness statement, not a limit statement. It is often used to compress error formulas after a Taylor expansion.
-      </p>
-      <h3>How numerical problem solving usually works</h3>
-      <p>
-        Most problems in this course can be organized into four moves. First, identify the exact object: a root, a solution vector,
-        or an interpolating polynomial. Second, choose a computable form: an iteration, a factorization, or a nested formula.
-        Third, define the right error quantity. For roots this is usually \(e_n=x_n-r\); for linear systems it is often the solution
-        error \(x-\tilde x\) together with the residual \(b-A\tilde x\); for interpolation it is \(f(x)-p(x)\). Fourth, compare one stage
-        to the next. If the new error is about a constant times the old error, expect linear convergence. If the new error is about
-        a constant times the square of the old error, expect quadratic convergence. If the new error is multiplied by something larger
-        than 1, the process is unstable or divergent.
+        The <strong>Mean Value Theorem</strong> says that if \(f\) is continuous on \([a,b]\) and differentiable on \((a,b)\), then there exists \(\xi\in(a,b)\) such that
+        \[
+          f'(\xi)=\frac{f(b)-f(a)}{b-a}.
+        \]
+        In numerical analysis this theorem is the bridge between differences of function values and derivatives. It is the tool used to prove uniqueness of fixed points, derive local condition-number formulas, and compare consecutive iterates.
       </p>
       <p>
-        This is also how to talk through exam problems. Do not just compute. Say what the approximation is, what the exact target is,
-        what quantity is being measured, and why the next step should improve or possibly worsen the approximation. A lot of numerical
-        analysis questions are really asking whether you can explain the mechanism behind the numbers.
+        <strong>Rolle's theorem</strong> says that if \(f\) is continuous on \([a,b]\), differentiable on \((a,b)\), and \(f(a)=f(b)\), then there exists \(\xi\in(a,b)\) with \(f'(\xi)=0\). In interpolation theory it is repeatedly applied to prove uniqueness and error formulas.
+      </p>
+      <p>
+        The <strong>Taylor formula with remainder</strong> says that if \(f\in C^{n+1}\) near \(c\), then
+        \[
+          f(x)=\sum_{k=0}^n \frac{f^{(k)}(c)}{k!}(x-c)^k + \frac{f^{(n+1)}(\xi)}{(n+1)!}(x-c)^{n+1}
+        \]
+        for some \(\xi\) between \(c\) and \(x\). This is the main source of truncation-error formulas, Newton error analysis, and interpolation remainder terms.
       </p>
 
-
-      <h3>What to recognize immediately</h3>
+      <h3>How to use these ideas on problems</h3>
       <ul class="bullets">
-        <li>If a proof uses local behavior near a root, expect Taylor expansion.</li>
-        <li>If a proof compares function values at two points, expect the Mean Value Theorem.</li>
-        <li>If a statement says many roots force a high derivative to vanish somewhere, expect Rolle’s theorem repeatedly.</li>
-        <li>If the question asks how fast a method converges, define \(e_n\) and try to relate \(e_{n+1}\) to \(e_n\).</li>
+        <li>If the question asks how fast something converges, define an error \(e_n\) immediately.</li>
+        <li>If the question compares function values at nearby points, expect the Mean Value Theorem.</li>
+        <li>If the question asks for a local error formula or rate, expect Taylor expansion.</li>
+        <li>If the question claims too many roots or interpolation conditions, expect Rolle's theorem or repeated differentiation logic.</li>
+        <li>If the problem describes successive approximations verbally, translate the story into a relation between \(e_{n+1}\) and \(e_n\).</li>
       </ul>
 
       <div class="divider"></div>
@@ -154,68 +142,53 @@
     <section id="Arithmetic" class="content">
       <h2>Floating-Point Arithmetic, Error, and Stability</h2>
 
-      <h3>Machine representation</h3>
+      <h3>Basic definitions</h3>
       <p>
-        Real numbers are stored in normalized binary scientific notation. In floating-point form, a nonzero number looks like
-        \(x=\pm q\,2^m\), where the mantissa is normalized. For Marc-32 the format is 1 sign bit, 8 exponent bits,
-        and 23 mantissa bits. For IEEE 64-bit double the format is 1 sign bit, 11 exponent bits, and 52 mantissa bits.
-        Most real numbers are not machine numbers, so the machine stores the nearest representable value instead.
-      </p>
-
-      <h3>Rounding and chopping</h3>
-      <p>
-        Chopping throws away all digits after a chosen place. Rounding replaces the number by the nearest available one.
-        Rounding is usually more accurate. If \(\tilde x\) is a rounded \(n\)-digit approximation and \(\hat x\) is a chopped one,
-        then rounding has a smaller worst-case error bound than chopping.
-      </p>
-
-      <h3>Absolute and relative error</h3>
-      <p>
-        If \(x\) is approximated by \(\tilde x\), then the absolute error is \(|x-\tilde x|\) and the relative error is
-        \(|x-\tilde x|/|x|\), assuming \(x\neq 0\). Absolute error measures raw size of the mistake. Relative error measures
-        scale-sensitive size. In numerical analysis, relative error is often the more meaningful quantity.
-      </p>
-
-      <h3>Machine epsilon</h3>
-      <p>
-        Machine epsilon measures the size of one-step relative rounding error. In Marc-32, the relative rounding error is bounded
-        by about \(2^{-24}\). In IEEE 64-bit, the bound is much smaller. This is why double precision usually delays visible failure.
-      </p>
-
-      <h3>Catastrophic cancellation</h3>
-      <p>
-        The most dangerous arithmetic pattern is subtraction of nearly equal numbers. Even when each input is stored accurately,
-        the leading digits cancel and the remaining digits can be mostly noise. Standard examples include the quadratic formula,
-        expressions like \(\sqrt{x+1}-\sqrt{x}\), and \((\cos x - 1)/x^2\) near zero. The usual fix is algebraic reformulation,
-        such as rationalizing or using an equivalent series-based form.
-      </p>
-
-      <h3>Stability and conditioning</h3>
-      <p>
-        Conditioning measures sensitivity of the mathematical problem itself. Stability measures whether the algorithm magnifies
-        the small errors created during computation. A well-conditioned problem can still be computed badly by an unstable algorithm.
-        A badly conditioned problem can defeat even a stable algorithm.
+        If an exact quantity \(x\) is approximated by \(\tilde x\), the <strong>absolute error</strong> is \(|x-\tilde x|\) and the <strong>relative error</strong> is \(|x-\tilde x|/|x|\) when \(x\neq 0\). Absolute error measures raw size of the discrepancy. Relative error measures discrepancy relative to the scale of the true quantity and is often the more meaningful quantity in computation.
       </p>
       <p>
-        For a differentiable scalar function \(f\), a local condition number is often written as
+        A numerical process is called <strong>unstable</strong> if small errors introduced at one stage are magnified in later stages so that the final result loses significant accuracy. This is an algorithmic notion. It is different from <strong>conditioning</strong>, which measures sensitivity of the mathematical problem itself.
+      </p>
+      <p>
+        For a differentiable scalar function \(f\), a local <strong>condition number</strong> at \(x\) is
         \[
-          \kappa_f(x)=\left|\frac{x f'(x)}{f(x)}\right|.
+          \kappa_f(x)=\left|\frac{x f'(x)}{f(x)}\right|,
         \]
-        Large magnitude means small relative changes in the input can cause large relative changes in the output.
+        provided \(f(x)\neq 0\). Large magnitude means small relative changes in the input can produce large relative changes in the output.
       </p>
 
-      <h3>Practical warnings</h3>
-      <ul class="bullets">
-        <li>Never trust direct equality tests on floating-point numbers unless the problem is designed that way.</li>
-        <li>Reformulate before computing if subtraction of nearly equal terms is present.</li>
-        <li>Distinguish clearly between the exact formula and the floating-point implementation of that formula.</li>
-        <li>A recurrence can be mathematically correct and still be numerically unstable.</li>
-      </ul>
+      <h3>Floating-point representation</h3>
       <p>
-        A good rule for error analysis is to ask two separate questions every time. First, how large is the data or rounding error entering this step? Second, what does the current formula
-        do to that error? Some operations pass it along mildly, some shrink it, and some magnify it dramatically. That is why successive iterations matter so much in this course: even a tiny
-        error can become dominant if the method keeps feeding it back through an amplifying mechanism.
+        A computer stores only finitely many real numbers exactly. A nonzero floating-point number is stored in normalized scientific notation, with a sign, an exponent, and a mantissa. Most real numbers are therefore replaced by nearby machine numbers. This first approximation is usually called rounding or chopping, depending on the rule used.
       </p>
+      <p>
+        <strong>Chopping</strong> discards digits beyond the storage limit. <strong>Rounding</strong> replaces the number by the nearest representable machine number. Rounding usually gives the smaller worst-case error bound. The smallest significant relative spacing of nearby machine numbers is controlled by the <strong>machine epsilon</strong>, which serves as a model size for one-step relative rounding error.
+      </p>
+
+      <h3>Error propagation and cancellation</h3>
+      <p>
+        The most dangerous arithmetic pattern is subtraction of nearly equal numbers. This is <strong>catastrophic cancellation</strong>. When leading digits cancel, the remaining digits may reflect earlier rounding noise more than genuine information. Standard examples include the smaller root in the quadratic formula, \(\sqrt{x+1}-\sqrt{x}\) for large \(x\), and formulas such as \((\cos x-1)/x^2\) near zero.
+      </p>
+      <p>
+        The fix is usually not to compute more carelessly, but to compute an algebraically equivalent expression that avoids cancellation. Rationalizing a numerator, switching to a conjugate form, or using a Taylor approximation are all examples of stability-improving reformulation.
+      </p>
+
+      <h3>Theoretical viewpoint on conditioning</h3>
+      <p>
+        If the input \(x\) is perturbed to \(x+h\), then by Taylor expansion,
+        \[
+          f(x+h)-f(x)=f'(x)h+O(h^2).
+        \]
+        Dividing by \(f(x)\) shows that the relative output change is locally controlled by \(\kappa_f(x)\) times the relative input change. This is why the derivative-based condition number appears naturally and why large derivative relative to function size signals sensitivity.
+      </p>
+
+      <h3>What exam-style questions often want here</h3>
+      <ul class="bullets">
+        <li>State whether the issue is conditioning of the problem or stability of the algorithm, and do not confuse them.</li>
+        <li>Compute both absolute and relative error if asked, then explain which one is more informative.</li>
+        <li>Identify cancellation before doing arithmetic.</li>
+        <li>Explain how an apparently correct formula can still be numerically dangerous because finite precision feeds through later stages.</li>
+      </ul>
 
       <div class="divider"></div>
     </section>
@@ -223,139 +196,100 @@
     <section id="Rootfinding" class="content">
       <h2>Nonlinear Equations and Rootfinding</h2>
 
-      <h3>The general problem</h3>
+      <h3>General setting</h3>
       <p>
-        The rootfinding problem is to solve \(f(r)=0\). Different methods make different tradeoffs. Bisection is slow but robust.
-        Newton is usually fast but depends heavily on the initial guess and derivative information. Secant avoids explicit derivatives
-        and is typically faster than bisection but less predictable than Newton. Fixed-point iteration gives a broader framework that
-        explains why some schemes converge and others do not.
+        The basic problem is to find \(r\) such that \(f(r)=0\). A numerical method produces approximations \(x_0,x_1,x_2,\dots\). The analysis then asks whether \(x_n\to r\), under what hypotheses this happens, and how the errors \(e_n=x_n-r\) behave.
       </p>
 
       <h3>Bisection method</h3>
       <p>
-        Start with an interval \([a_0,b_0]\) where \(f\) is continuous and \(f(a_0)f(b_0)&lt;0\). Define the midpoint
-        \(c_n=(a_n+b_n)/2\), keep the half interval where the sign change remains, and repeat. The method is guaranteed to converge
-        to a root in the interval under the sign-change assumption.
+        The method begins with an interval \([a_0,b_0]\) on which \(f\) is continuous and \(f(a_0)f(b_0)&lt;0\). By the <strong>Intermediate Value Theorem</strong>, there exists a root \(r\in(a_0,b_0)\). Let
+        \[
+          c_n=\frac{a_n+b_n}{2}.
+        \]
+        Choose the half-interval where the sign change persists and repeat.
       </p>
       <p>
-        The interval width halves every step:
+        The key theorem-level fact is that the interval width halves each time:
         \[
           b_n-a_n = 2^{-n}(b_0-a_0).
         \]
-        The midpoint error satisfies
+        Since the root remains in \([a_n,b_n]\), the midpoint error satisfies
         \[
-          |r-c_n| \le 2^{-(n+1)}(b_0-a_0).
+          |r-c_n|\le \frac{b_n-a_n}{2}=2^{-(n+1)}(b_0-a_0).
         \]
-        This is why bisection is called linearly convergent: each step reduces the worst-case error bound by a factor of one half.
+        This is a fully explicit error bound and is the standard reason bisection is classified as linearly convergent.
       </p>
       <p>
-        Strengths: guaranteed convergence, simple stopping rule, easy error bound. Weaknesses: slow, and it cannot find roots unless
-        a sign change is available.
-      </p>
-      <p>
-        In successive iterations, the important quantity is not just the current midpoint but the interval that survives. Every step throws
-        away half of the uncertainty and keeps the half that still contains the root. So the method is telling you exactly how ignorance shrinks:
-        after one step, the uncertainty is half as large; after two steps, one quarter as large; after \(n\) steps, \(2^{-n}\) of the original width.
-        This is why bisection is the cleanest method for error-analysis questions. It gives a guaranteed worst-case bound even if the actual root is
-        behaving badly.
-      </p>
-      <p>
-        When a problem asks for the number of iterations, solve the inequality coming from the error bound. When it asks for the conceptual rate,
-        say that each step multiplies the error bound by \(1/2\), so the convergence is linear. When it asks whether bisection is efficient, the honest
-        answer is that it is efficient in reliability, not in speed.
+        In conceptual terms, bisection does not guess a better point directly. It shrinks uncertainty geometrically. That makes it slow but extremely reliable. If a question asks how many iterations are needed for a certain tolerance, solve the midpoint-error inequality for \(n\).
       </p>
 
-      <h3>Newton’s method</h3>
+      <h3>Newton's method</h3>
       <p>
-        Newton’s update is
+        Newton's iteration is
         \[
-          x_{n+1} = x_n - \frac{f(x_n)}{f'(x_n)}.
+          x_{n+1}=x_n-\frac{f(x_n)}{f'(x_n)}.
         \]
-        Geometrically, this is the x-intercept of the tangent line at \((x_n,f(x_n))\). If \(r\) is a simple root and
-        \(f\in C^2\), then for initial guesses sufficiently near \(r\), Newton’s method has quadratic convergence:
+        Geometrically, \(x_{n+1}\) is the x-intercept of the tangent line to \(f\) at \((x_n,f(x_n))\).
+      </p>
+      <p>
+        The main theorem used in this course is the local error theorem: if \(f\in C^2\), \(r\) is a simple root, and \(x_n\) remains sufficiently close to \(r\), then there is a constant \(C&gt;0\) such that
         \[
-          |x_{n+1}-r| \le C|x_n-r|^2.
+          |x_{n+1}-r|\le C|x_n-r|^2.
         \]
+        This is the precise statement of quadratic convergence. It comes from Taylor expanding \(f\) near the root and using the fact that the first-order term is cancelled by the Newton correction.
       </p>
       <p>
-        Strengths: very fast near a simple root. Weaknesses: can diverge, can land where \(f'(x_n)=0\), and is only locally reliable.
-        A good initial guess matters.
-      </p>
-      <p>
-        The practical error story is that Newton spends its early steps trying to enter the local regime where the tangent line is a good model of the
-        function. Once it is close enough to a simple root, the dominant error term becomes quadratic, so the next error is roughly proportional to the square
-        of the current error. That means if the current error is already small, the next one becomes dramatically smaller. This is the source of the familiar
-        jump in correct digits after a few successful steps.
-      </p>
-      <p>
-        But the same tangent-line idea explains failure too. If the tangent is nearly horizontal, the correction term can explode. If the function is curved in
-        an unfortunate way relative to the starting point, the tangent may send the iterate away from the root. If the root has multiplicity greater than one,
-        the quadratic behavior is lost and the method often drops to linear-style behavior. So on conceptual questions, the right answer is usually not just
-        “Newton is fast,” but “Newton is fast once the local Taylor model is accurate and the derivative at the root is nonzero.”
+        The hypotheses matter. The derivative must not vanish at the root, the function must be smooth enough, and the initial guess must enter the local basin where the tangent-line model is accurate. If \(f'(x_n)=0\) or the iterates wander away, the method can fail despite being very fast near a good root.
       </p>
 
       <h3>Secant method</h3>
       <p>
-        The secant update is
+        The secant method replaces the derivative in Newton's formula by a finite-difference slope:
         \[
-          x_{n+1}=x_n - f(x_n)\frac{x_n-x_{n-1}}{f(x_n)-f(x_{n-1})}.
+          x_{n+1}=x_n-f(x_n)\frac{x_n-x_{n-1}}{f(x_n)-f(x_{n-1})}.
         \]
-        It replaces the derivative in Newton’s method by a finite-difference slope. That means no symbolic derivative is needed.
-        For a simple root and enough smoothness, the secant method is superlinear with order
+        It uses two previous iterates instead of an exact derivative. For a simple root under suitable smoothness, the convergence is superlinear, with order
         \[
-          \frac{1+\sqrt{5}}{2}\approx 1.618.
+          \alpha=\frac{1+\sqrt5}{2}.
         \]
-        So it is faster than linear convergence, but slower than quadratic convergence.
+        So it is faster than linear convergence but slower than quadratic convergence.
+      </p>
+      <p>
+        Conceptually, the secant method inherits Newton's local philosophy but with approximate slope information. That is why it can be faster than bisection without needing symbolic derivatives, yet more erratic than Newton in early steps.
       </p>
 
       <h3>Fixed-point iteration</h3>
       <p>
-        Rewrite the equation \(f(r)=0\) as \(r=F(r)\). Then iterate
+        A <strong>fixed point</strong> of a function \(F\) is a number \(s\) such that \(F(s)=s\). To solve \(f(r)=0\), one often rewrites the equation as \(x=F(x)\) and iterates
         \[
           x_{n+1}=F(x_n).
         \]
-        The point is not that every rearrangement works. The point is to choose a rearrangement that is contractive.
       </p>
       <p>
-        If \(F:[a,b]\to[a,b]\) and \(|F'(x)|\le \omega &lt; 1\) on the interval, then \(F\) is a contraction.
-        In that case there is a unique fixed point \(s\in[a,b]\), and for any starting value in the interval,
-        \(x_n\to s\). The error estimate is
+        Two theorem-level facts are central here. First, if \(F:(0,1)\to(0,1)\) is differentiable and \(|F'(x)|&lt;1\) throughout the interval, then there can be at most one fixed point; this follows from the Mean Value Theorem. Second, if \(F:[a,b]\to[a,b]\) is continuous, then it has at least one fixed point; this follows by applying the Intermediate Value Theorem to \(g(x)=F(x)-x\).
+      </p>
+      <p>
+        The strongest practical theorem is the contraction statement: if \(F:[a,b]\to[a,b]\) and \(|F'(x)|\le \omega&lt;1\) for all \(x\in[a,b]\), then there is a unique fixed point \(s\in[a,b]\), and every iteration starting in \([a,b]\) converges to \(s\). Moreover,
         \[
-          |s-x_n| \le \frac{\omega^n}{1-\omega}|x_1-x_0|.
+          |s-x_n|\le \frac{\omega^n}{1-\omega}|x_1-x_0|.
         \]
       </p>
       <p>
-        Interpretation of \(|F'(s)|\): if it is bigger than 1, expect divergence; if it is near 1, expect slow convergence;
-        if it is near 0, expect very fast local convergence. Newton’s method can itself be viewed as a fixed-point method,
-        with derivative zero at a simple root, which is why it becomes quadratic.
-      </p>
-      <p>
-        This is one of the most useful practical frameworks in the course. If you can rewrite a method as \(x_{n+1}=F(x_n)\), then many conceptual questions become
-        derivative questions. A graph crossing the line \(y=x\) with slope magnitude less than 1 tends to pull nearby iterates inward. A crossing with slope magnitude
-        greater than 1 tends to push them outward. If the slope is positive, the approach is often monotone; if it is negative, oscillation is common. So when your exam asks
-        what successive iterations will do, the sign and size of \(F'\) are often the main story.
+        This is where many conceptual exam questions come from. If \(|F'(s)|&gt;1\), nearby errors are pushed away. If \(|F'(s)|\approx 1\), convergence is slow. If \(F'(s)&lt;0\), oscillation is common. If \(F'(s)=0\), the method can converge much faster locally.
       </p>
 
-      <h3>Aitken acceleration</h3>
+      <h3>Roots of polynomials and Horner's method</h3>
       <p>
-        For linearly convergent fixed-point sequences, Aitken’s extrapolation can dramatically improve the approximation. One useful form is
+        Horner's method rewrites a polynomial
         \[
-          s \approx x_n - \frac{d_n^2}{d_n-d_{n-1}}, \qquad d_n=x_n-x_{n-1}.
+          p(x)=a_nx^n+a_{n-1}x^{n-1}+\cdots+a_1x+a_0
         \]
-        This can be excellent for slowly convergent fixed-point iterations, but it is not automatically an improvement for every method.
-        In particular, it is often unnecessary or even harmful when the base method is already quadratically convergent, as in Newton’s method.
-      </p>
-
-      <h3>Roots of polynomials and Horner’s method</h3>
-      <p>
-        Horner’s method evaluates a polynomial efficiently and stably in nested form. For
-        \(p(x)=a_nx^n+\cdots+a_1x+a_0\), write
+        in nested form,
         \[
           p(x)=(((a_nx+a_{n-1})x+a_{n-2})x+\cdots)x+a_0.
         \]
-        A second Horner pass gives \(p'(x)\) at the same evaluation point. Complete Horner also produces coefficients of the expansion
-        in powers of \((x-c)\), which is useful when a problem asks for
-        \(p(x)=\sum_{k=0}^n a_k(x-c)^k\).
+        This reduces arithmetic cost and is usually the preferred way to evaluate polynomials numerically. A related repeated process also gives coefficients in powers of \((x-c)\), which is useful when a problem asks for a shifted expansion.
       </p>
 
       <div class="divider"></div>
@@ -364,117 +298,74 @@
     <section id="LinearSystems" class="content">
       <h2>Linear Systems, Elimination, Factorizations, and Norms</h2>
 
-      <h3>Triangular systems</h3>
+      <h3>Definitions from matrix algebra</h3>
       <p>
-        The systems that are actually easy to solve are triangular systems. For upper triangular systems use back substitution.
-        For lower triangular systems use forward substitution. This is why elimination is valuable: it converts a hard system
-        into triangular ones.
+        An <strong>elementary row operation</strong> is one of three actions on a matrix: interchange two rows, multiply a row by a nonzero scalar, or add a scalar multiple of one row to another row. An <strong>elementary matrix</strong> is a matrix obtained by applying one elementary row operation to the identity matrix. Left-multiplying by that elementary matrix performs the same row operation on any compatible matrix.
+      </p>
+      <p>
+        A matrix \(L\) is <strong>lower triangular</strong> if entries above the diagonal are zero. A matrix \(U\) is <strong>upper triangular</strong> if entries below the diagonal are zero. These systems are easy to solve by forward or backward substitution.
+      </p>
+      <p>
+        An <strong>LU factorization</strong> of a square matrix \(A\) is a representation \(A=LU\) with \(L\) lower triangular and \(U\) upper triangular. With row interchanges included, the more general factorization is \(PA=LU\), where \(P\) is a permutation matrix.
       </p>
 
-      <h3>LU factorization</h3>
+      <h3>Invertibility theorem</h3>
       <p>
-        If a matrix admits a factorization \(A=LU\), where \(L\) is lower triangular and \(U\) is upper triangular, then solving
-        \(Ax=b\) becomes two steps:
-        first solve \(Ly=b\), then solve \(Ux=y\). The elimination multipliers populate \(L\), while the final upper matrix is \(U\).
-      </p>
-      <p>
-        Doolittle factorization is the version where the diagonal entries of \(L\) are all 1. It is convenient because it reduces
-        the number of unknown factor entries.
+        A central theorem states that for a square matrix \(A\), the following are equivalent: \(A^{-1}\) exists, \(\det(A)\neq 0\), the system \(Ax=b\) has a unique solution for every \(b\), the homogeneous system \(Ax=0\) has only the trivial solution, and \(A\) can be written as a product of elementary matrices. This theorem explains why questions about uniqueness, determinants, invertibility, and elimination are all connected.
       </p>
 
-      <h3>Gaussian elimination</h3>
+      <h3>Gaussian elimination and pivoting</h3>
       <p>
-        Gaussian elimination removes entries below the pivot one column at a time. The central structural requirement is that the pivots
-        stay nonzero. If all required pivot entries remain nonzero, elimination yields an LU decomposition.
+        Gaussian elimination zeroes entries below a pivot one column at a time. In exact arithmetic it transforms the system into an equivalent upper triangular system. In floating-point arithmetic the danger comes from small pivots, because dividing by a tiny pivot produces large multipliers, and large multipliers amplify existing roundoff.
       </p>
       <p>
-        In exact arithmetic this is algebraically straightforward. In floating-point arithmetic it can be numerically dangerous,
-        because tiny pivots lead to large multipliers, and large multipliers amplify rounding error.
+        <strong>Partial pivoting</strong> chooses the largest available entry in the current column as the pivot. <strong>Scaled partial pivoting</strong> compares candidates after normalizing by row size. Both are attempts to control the growth of multipliers and therefore control numerical instability through the elimination stages.
       </p>
 
-      <h3>Pivoting</h3>
+      <h3>Vector norms and matrix norms</h3>
       <p>
-        Partial pivoting swaps rows so the pivot has largest absolute value in the current column. Scaled partial pivoting compares
-        candidate pivots after normalizing by the largest entry in each row. The point is the same in both cases: avoid division by a small
-        number when a much better pivot is available.
+        A <strong>norm</strong> on a vector space is a function \(\|\cdot\|\) satisfying positivity, homogeneity, and the triangle inequality. On \(\mathbb R^n\), the standard examples are
+        \[
+          \|x\|_1=\sum_{i=1}^n |x_i|,\qquad
+          \|x\|_2=\left(\sum_{i=1}^n x_i^2\right)^{1/2},\qquad
+          \|x\|_\infty=\max_i |x_i|.
+        \]
       </p>
       <p>
-        In practice, pivoting usually improves accuracy because it keeps multipliers smaller. A recurring course theme is that the same exact
-        algebra can produce very different numerical results depending on whether pivoting is used.
+        Given a vector norm, the associated <strong>subordinate matrix norm</strong> is
+        \[
+          \|A\|=\max_{\|u\|=1}\|Au\|.
+        \]
+        A theorem from the notes says this really is a norm on matrices. The important consequences are
+        \[
+          \|Ax\|\le \|A\|\,\|x\|,\qquad \|AB\|\le \|A\|\,\|B\|,\qquad \|I\|=1.
+        \]
+        These are the workhorses of error bounds in linear systems.
       </p>
       <p>
-        For successive elimination steps, the danger is cumulative. Each row operation is performed in floating-point arithmetic, so each new row already carries tiny rounding
-        errors from earlier steps. If a later step multiplies those errors by a large multiplier, they can become visible in the final answer. Pivoting helps because smaller multipliers
-        mean less amplification from stage to stage. So when a question asks why elimination without pivoting can fail, the real answer is not just “small pivots are bad” but “small pivots
-        create large multipliers, and large multipliers spread and amplify earlier roundoff through the remaining steps.”
+        The <strong>spectral norm</strong> or matrix 2-norm is
+        \[
+          \|A\|_2=\max_{\|x\|_2=1}\|Ax\|_2.
+        \]
       </p>
 
-      <h3>PLU form</h3>
+      <h3>Residual, error, condition number, and refinement</h3>
       <p>
-        With row swaps included, the clean factorization is
+        If \(\tilde x\) is an approximate solution to \(Ax=b\), then the <strong>error vector</strong> is \(e=x-\tilde x\) and the <strong>residual</strong> is
         \[
-          PA = LU,
+          r=b-A\tilde x.
         \]
-        where \(P\) is a permutation matrix. Determinants then satisfy
-        \[
-          \det(P)\det(A)=\det(L)\det(U).
-        \]
-        Since triangular matrix determinants are products of diagonal entries, this gives a quick route to \(\det(A)\) after elimination.
-      </p>
-
-      <h3>Matrix norms and subordinate norms</h3>
-      <p>
-        A subordinate matrix norm is the one induced by a vector norm:
-        \[
-          \|A\| = \max_{\|x\|=1} \|Ax\|.
-        \]
-        These norms satisfy the key inequalities
-        \[
-          \|Ax\|\le \|A\|\,\|x\|, \qquad \|AB\|\le \|A\|\,\|B\|, \qquad \|I\|=1.
-        \]
-        For the infinity norm,
-        \[
-          \|A\|_\infty = \max_i \sum_j |a_{ij}|,
-        \]
-        which is the largest absolute row sum.
+        Since \(r=Ae\), a small residual does not necessarily imply a small error unless the inverse of \(A\) is well controlled.
       </p>
       <p>
-        Not every matrix norm is subordinate. If a question asks whether a given matrix expression defines a norm,
-        check positivity, homogeneity, and the triangle inequality. If it asks whether it is subordinate, then there must also exist
-        some vector norm so that the expression equals \(\sup_{\|x\|=1}\|Ax\|\).
-      </p>
-
-      <h3>Residual, error, and condition number</h3>
-      <p>
-        If \(\tilde x\) is an approximate solution of \(Ax=b\), then the error vector is \(e=x-\tilde x\) and the residual is
-        \[
-          r=b-A\tilde x = A(x-\tilde x)=Ae.
-        \]
-        A small residual does not automatically mean a small error; the matrix may be ill-conditioned.
-      </p>
-      <p>
-        For an invertible matrix and a subordinate norm, the condition number is
+        For an invertible matrix, the <strong>condition number</strong> in a chosen subordinate norm is
         \[
           \kappa(A)=\|A\|\,\|A^{-1}\|.
         \]
-        Large \(\kappa(A)\) means the system is sensitive: small relative changes in data can produce large relative changes in the solution.
+        Large condition number means that the problem \(Ax=b\) is sensitive to perturbations in the data. This is a property of the matrix problem itself, not of any specific elimination algorithm.
       </p>
-
-      <h3>Iterative refinement</h3>
       <p>
-        If \(\tilde x\) is approximate, compute the residual \(r=b-A\tilde x\), solve \(Ay=r\), and use \(\tilde x+y\) as a corrected solution.
-        Since
-        \[
-          A(\tilde x+y)=A\tilde x + Ay = A\tilde x + (b-A\tilde x)=b,
-        \]
-        the corrected vector can be much better, especially when the residual equation is solved carefully.
-      </p>
-
-      <h3>Sparse structure matters</h3>
-      <p>
-        The cost of solving a system depends strongly on matrix structure. A tridiagonal matrix can often be solved in linear time once its
-        sparse factorization is used, instead of the cubic-style work associated with dense elimination. When a problem mentions bidiagonal,
-        tridiagonal, or banded structure, pay attention to operation counts.
+        <strong>Iterative refinement</strong> starts from \(\tilde x\), forms the residual \(r=b-A\tilde x\), solves \(Ay=r\), and uses \(\tilde x+y\) as a corrected approximation. The point is that the residual equation tries to solve directly for the remaining error.
       </p>
 
       <div class="divider"></div>
@@ -483,237 +374,129 @@
     <section id="Interpolation" class="content">
       <h2>Polynomial Interpolation, Divided Differences, and Hermite Data</h2>
 
-      <h3>Polynomial interpolation</h3>
+      <h3>Interpolation problem and uniqueness theorem</h3>
       <p>
-        Given distinct nodes \(x_0,\dots,x_n\) and data \(y_j=f(x_j)\), there is a unique polynomial of degree at most \(n\)
-        that matches all the data. Uniqueness comes from the fact that a nonzero polynomial of degree at most \(n\) cannot have \(n+1\) distinct roots.
+        Given distinct nodes \(x_0,x_1,\dots,x_n\) and prescribed values \(y_0,y_1,\dots,y_n\), the interpolation problem asks for a polynomial \(p\) with degree at most \(n\) such that
+        \[
+          p(x_j)=y_j\qquad (j=0,1,\dots,n).
+        \]
+        The key theorem says that if \(x_0&lt;x_1&lt;\cdots&lt;x_n\), then for any real data \(y_0,\dots,y_n\), there exists a unique polynomial of degree at most \(n\) satisfying these conditions.
+      </p>
+      <p>
+        The uniqueness proof is important conceptually: if two such polynomials existed, their difference would be a polynomial of degree at most \(n\) with \(n+1\) distinct roots, so it would have to be the zero polynomial.
       </p>
 
       <h3>Lagrange form</h3>
       <p>
-        The interpolating polynomial can be written as
-        \[
-          p(x)=\sum_{k=0}^n y_k \ell_k(x),
-        \]
-        where the cardinal functions are
+        The <strong>Lagrange basis polynomials</strong> are
         \[
           \ell_k(x)=\prod_{j\ne k}\frac{x-x_j}{x_k-x_j}.
         \]
-        Each \(\ell_k\) satisfies \(\ell_k(x_j)=\delta_{kj}\). Lagrange form is conceptually clean, but not always the best for repeated computation.
+        They satisfy \(\ell_k(x_j)=\delta_{kj}\), where \(\delta_{kj}\) is the Kronecker delta. The interpolating polynomial is then
+        \[
+          p(x)=\sum_{k=0}^n y_k\,\ell_k(x).
+        \]
+        This form is conceptually transparent because each basis function isolates one data value.
       </p>
 
-      <h3>Newton form</h3>
+      <h3>Newton form and divided differences</h3>
       <p>
-        Newton form builds the polynomial incrementally:
+        The Newton form is
         \[
-          p_n(x)=c_0 + c_1(x-x_0) + c_2(x-x_0)(x-x_1)+\cdots + c_n\prod_{j=0}^{n-1}(x-x_j).
+          p_n(x)=c_0+c_1(x-x_0)+c_2(x-x_0)(x-x_1)+\cdots+c_n\prod_{j=0}^{n-1}(x-x_j).
         \]
-        This form is better for adding new nodes and for evaluation in nested form.
+        The coefficients \(c_k\) are the <strong>divided differences</strong>.
       </p>
-
-      <h3>Divided differences</h3>
       <p>
-        The Newton coefficients are divided differences. The first ones are
+        They are defined recursively by
         \[
-          f[x_0]=f(x_0), \qquad f[x_0,x_1]=\frac{f(x_1)-f(x_0)}{x_1-x_0}.
+          f[x_0]=f(x_0),\qquad f[x_0,x_1]=\frac{f(x_1)-f(x_0)}{x_1-x_0},
         \]
-        Higher-order divided differences satisfy the recursion
+        and for higher order,
         \[
           f[x_0,\dots,x_n]=\frac{f[x_1,\dots,x_n]-f[x_0,\dots,x_{n-1}]}{x_n-x_0}.
         \]
-        The top row of the divided-difference table supplies the Newton coefficients directly.
+        The highest-order divided difference over the listed nodes is exactly the leading Newton coefficient.
       </p>
 
-      <h3>Interpolation error</h3>
+      <h3>Interpolation error theorem</h3>
       <p>
-        If \(f\in C^{n+1}\) and \(p\) is the degree-\(n\) interpolating polynomial at nodes \(x_0&lt;\cdots&lt;x_n\), then for each
-        \(x\in[x_0,x_n]\),
+        If \(f\in C^{n+1}\) on an interval containing the nodes and \(p\) is the degree-\(n\) interpolating polynomial, then for each \(x\) in the interval there exists \(\omega\) in the interval such that
         \[
-          f(x)-p(x)=\frac{f^{(n+1)}(\omega)}{(n+1)!}\prod_{j=0}^n (x-x_j)
+          f(x)-p(x)=\frac{f^{(n+1)}(\omega)}{(n+1)!}\prod_{j=0}^n (x-x_j).
         \]
-        for some \(\omega\in(x_0,x_n)\). The error is naturally small near one of the nodes because one factor in the product is then small.
-      </p>
-      <p>
-        Increasing the degree is not always better. On a uniform grid, very high degree interpolation can behave badly. Node placement matters.
-      </p>
-      <p>
-        The practical viewpoint is that interpolation error comes from two sources at once: the smoothness of \(f\), through \(f^{(n+1)}\), and the geometry of the nodes,
-        through the product \(\prod_{j=0}^n (x-x_j)\). So a problem about interpolation error is not just asking whether the function is nice. It is also asking where the evaluation
-        point sits relative to the chosen nodes. Near a node one factor is small, so the error tends to be small. Far from the nodes, or with poorly spaced nodes, the product can
-        become large and wipe out the benefit of higher degree.
+        This formula shows that interpolation error depends on two things simultaneously: smoothness of the function through \(f^{(n+1)}\), and geometry of the nodes through the product term.
       </p>
 
       <h3>Hermite interpolation</h3>
       <p>
-        Hermite interpolation matches function values and derivative values. Given nodes \(x_0&lt;\cdots&lt;x_n\), values \(y_j\),
-        and derivatives \(y'_j\), there is a unique polynomial of degree at most \(2n+1\) such that
+        Hermite interpolation prescribes both function values and derivative values. Given nodes \(x_0&lt;\cdots&lt;x_n\), function values \(y_j\), and derivative values \(y'_j\), the problem is to find a polynomial \(p\) with
         \[
-          p(x_j)=y_j, \qquad p'(x_j)=y'_j,
+          p(x_j)=y_j,\qquad p'(x_j)=y'_j\qquad (j=0,1,\dots,n).
         \]
-        for every \(j\).
+        The theorem from the notes says there exists a unique polynomial of degree at most \(2n+1\) satisfying these conditions.
       </p>
       <p>
-        In divided-difference language, repeated nodes encode derivative data. For example,
+        Repeated nodes encode derivative data in divided-difference language. The first repeated-node divided difference is defined by
         \[
           f[x_0,x_0]=f'(x_0).
         \]
-        More generally, Hermite tables are built by repeating nodes and inserting derivative information into the repeated-node entries.
+        This is the basic bridge from ordinary divided differences to Hermite tables.
       </p>
 
       <div class="divider"></div>
     </section>
 
     <section id="Patterns" class="content">
-      <h2>Problem Patterns and What They Usually Want</h2>
+      <h2>Problem Patterns</h2>
 
-      <h3>If the problem is about error or precision</h3>
+      <h3>When the problem asks for a theorem</h3>
       <ul class="bullets">
-        <li>Separate absolute error from relative error immediately.</li>
-        <li>Ask whether the issue is conditioning, stability, or both.</li>
-        <li>Look for cancellation and try an algebraic reformulation.</li>
-        <li>If a matrix is involved, check whether the condition number is the actual bottleneck.</li>
+        <li>For existence of a root in an interval: continuity plus sign change gives the Intermediate Value Theorem.</li>
+        <li>For uniqueness of a fixed point: use the Mean Value Theorem and the bound \(|F'|&lt;1\).</li>
+        <li>For local Newton rate: state the simple-root and \(C^2\) hypotheses before quoting quadratic convergence.</li>
+        <li>For interpolation existence and uniqueness: distinct nodes and degree at most \(n\).</li>
+        <li>For Hermite interpolation: values and first derivatives at \(n+1\) nodes give degree at most \(2n+1\).</li>
       </ul>
 
-      <h3>If the problem is about convergence of an iteration</h3>
+      <h3>When the problem is really about error analysis</h3>
       <ul class="bullets">
-        <li>Define the fixed-point map \(F\) if possible.</li>
-        <li>Check whether \(|F'(x)|&lt;1\) on an interval or at least near the fixed point.</li>
-        <li>For Newton or secant, identify whether the root is simple.</li>
-        <li>Write \(e_n=x_n-r\) and try to derive \(e_{n+1}\) in terms of \(e_n\) or \((e_n,e_{n-1})\).</li>
-        <li>Say explicitly what happens from one iteration to the next: halves, multiplies by a constant, squares, oscillates, or grows.</li>
-        <li>If the derivative at the fixed point is close to 1 or \(-1\), expect slow convergence or oscillation even if the method still converges.</li>
-      </ul>
-
-      <h3>If the problem is about bisection</h3>
-      <ul class="bullets">
-        <li>The interval width after \(n\) steps is \(2^{-n}(b_0-a_0)\).</li>
-        <li>The midpoint error is at most half of that width.</li>
-        <li>Iteration-count questions usually come from solving the inequality for \(n\).</li>
-      </ul>
-
-      <h3>If the problem is about elimination or LU</h3>
-      <ul class="bullets">
-        <li>Track the multipliers carefully; they become entries of \(L\).</li>
-        <li>Watch whether the problem wants \(A=LU\) or \(PA=LU\).</li>
-        <li>If numerical behavior is part of the question, discuss pivoting and condition number separately.</li>
-        <li>When asked why a computed solution is inaccurate, check three different causes: bad conditioning of \(A\), unstable elimination steps, or both.</li>
-        <li>Use residual language carefully: a small residual means the approximate vector nearly satisfies the equation, not automatically that it is close to the true solution.</li>
-      </ul>
-
-      <h3>If the problem is about interpolation</h3>
-      <ul class="bullets">
-        <li>Write the node set and degree first.</li>
-        <li>Use Lagrange form for conceptual construction and Newton form for table-based computation.</li>
-        <li>If error is asked for, write the \((n+1)\)-st derivative term and the node product term.</li>
-        <li>Ask where the evaluation point sits relative to the nodes; this often explains the size of the error more clearly than the formula alone.</li>
-        <li>Do not confuse exact fit at the nodes with good behavior everywhere between or beyond the nodes.</li>
+        <li>Identify the exact target and define the error quantity before doing algebra.</li>
+        <li>Say whether you are tracking absolute error, relative error, residual, or interpolation remainder.</li>
+        <li>Explain what one more iteration does to the current error.</li>
+        <li>Separate finite-precision effects from exact-arithmetic convergence claims.</li>
       </ul>
 
       <div class="divider"></div>
     </section>
 
-
     <section id="Iterations" class="content">
       <h2>How to Analyze Successive Iterations</h2>
 
-      <h3>The core habit</h3>
+      <h3>The general strategy</h3>
       <p>
-        When a method produces a sequence \(x_0,x_1,x_2,\dots\), the main question is not just whether the numbers look closer.
-        The real question is what rule carries one error into the next. Write the exact target as \(r\) or \(x\), define the
-        current error, and then compare stages. For scalar rootfinding this usually means \(e_n=x_n-r\). For linear systems it may
-        mean comparing a new residual or correction to the previous one. Once that relation is visible, the behavior of the whole
-        method becomes much easier to predict.
+        Successive-iteration questions are asking for a dynamical picture of the error, not just a list of computed numbers. Start by naming the target \(r\) or \(x\). Define the current error. Then identify the rule that maps one step to the next. If you can explain what the update does to the current error, you usually have the whole conceptual answer.
       </p>
       <p>
-        In practice, look at three things at every step: the size of the update, the sign pattern of the update, and the ratio between
-        successive errors or corrections whenever that ratio makes sense. These three observations usually tell you whether the method is
-        contracting, oscillating, stalling, or blowing up.
+        For bisection the update halves uncertainty. For a contraction mapping the update multiplies error by about \(|F'(r)|\). For Newton near a simple root the update makes the next error behave like a constant times the square of the current one. For elimination, each stage may propagate earlier rounding through new multipliers. In every case the key phrase is the same: what happens to the previous error after one more application of the algorithm?
       </p>
 
-      <h3>What different iteration patterns usually mean</h3>
+      <h3>Patterns to recognize</h3>
       <ul class="bullets">
-        <li>If \(|e_{n+1}|\approx c|e_n|\) with a nearly constant \(0&lt;c&lt;1\), expect linear convergence.</li>
-        <li>If \(|e_{n+1}|\approx c|e_n|^2\), expect quadratic convergence.</li>
-        <li>If \(|e_{n+1}|/|e_n|\to 0\) but not quadratically, expect superlinear convergence.</li>
-        <li>If the sign of \(e_n\) alternates while the magnitude shrinks, the method is often converging with oscillation.</li>
-        <li>If the magnitude barely shrinks, the contraction factor is probably close to 1 or the method has entered a slow regime.</li>
-        <li>If updates suddenly stop improving, finite precision, cancellation, or a bad local model may have become dominant.</li>
-        <li>If the updates grow, the iteration is diverging or has left the region where the analysis applies.</li>
+        <li>If \(|e_{n+1}|\approx c|e_n|\) with \(0&lt;c&lt;1\), the behavior is linear.</li>
+        <li>If \(|e_{n+1}|\approx c|e_n|^2\), the behavior is quadratic.</li>
+        <li>If the sign alternates while magnitude shrinks, the method is converging with oscillation.</li>
+        <li>If the ratio \(|e_{n+1}|/|e_n|\) stays close to 1, convergence is slow or stalled.</li>
+        <li>If updates grow, the method has left the region of attraction or the process is unstable.</li>
       </ul>
 
-      <h3>Bisection across steps</h3>
-      <p>
-        Bisection is the cleanest case because the iteration acts on an interval rather than only on a point. The uncertainty interval is
-        halved every step, so the worst-case midpoint error is halved every step as well. Nothing mysterious is happening from one stage
-        to the next: the method simply keeps the half that still contains the root. If a problem asks what happens after many iterations,
-        the correct answer is that uncertainty shrinks geometrically by a factor of \(1/2\) per step.
-      </p>
-
-      <h3>Newton across steps</h3>
-      <p>
-        Newton should be read in two phases. Before the iterate is close to the root, the tangent-line model may or may not help. After
-        the iterate enters the local regime near a simple root, the first-order error term is cancelled and the dominant term is quadratic.
-        That is why the method can look ordinary at first and then suddenly become extremely accurate. When an exam asks what happens in
-        successive Newton iterates, mention both phases if needed: entry into the local regime and then quadratic error squaring.
-      </p>
-      <p>
-        A useful practical signal is the correction size \(\Delta_n = -f(x_n)/f'(x_n)\). If \(|\Delta_n|\) is shrinking rapidly and the
-        iterates are stabilizing near a root, the local model is probably working. If \(|\Delta_n|\) becomes huge or erratic, a small derivative,
-        bad starting point, or non-simple root may be the reason.
-      </p>
-
-      <h3>Secant across steps</h3>
-      <p>
-        The secant method uses two previous iterates, so its step-to-step behavior is naturally less regular than Newton’s. The slope is
-        estimated from two points, which means the update can react strongly if those function values are very close or if the secant line
-        is a poor local model. Conceptually, the method tends to improve faster than linear methods once it is behaving well, but the early
-        iterates can be more uneven because the slope information is only approximate.
-      </p>
-
-      <h3>Fixed-point iteration across steps</h3>
-      <p>
-        For \(x_{n+1}=F(x_n)\), the derivative of \(F\) near the fixed point controls the story. If \(|F'(r)|&lt;1\), nearby errors are
-        multiplied by roughly \(|F'(r)|\), so they shrink. If \(F'(r)\) is negative, the iterates often alternate across the fixed point.
-        If \(F'(r)\) is close to 0, convergence can be very fast. If \(|F'(r)|&gt;1\), nearby errors are pushed outward and the iteration is
-        locally repelling.
-      </p>
-      <p>
-        This gives a strong template for conceptual answers: say whether the map pulls points inward or pushes them outward, and explain whether
-        the sign of the derivative suggests monotone approach or oscillation. Many “describe the iteration” questions are really asking for
-        that interpretation.
-      </p>
-
-      <h3>Successive elimination steps and propagated error</h3>
-      <p>
-        Elimination is not usually written as \(x_{n+1}=F(x_n)\), but it is still a multistage process where each step feeds into the next.
-        Each row operation creates new rounded entries. Later row operations use those rounded entries again. So the key conceptual question is
-        whether the algorithm keeps these local errors controlled or multiplies them through large elimination factors. That is why pivoting is
-        so important: it changes the later stages by changing the size of the multipliers that act on existing error.
-      </p>
-
-      <h3>Residual-based correction across steps</h3>
-      <p>
-        In iterative refinement, the current approximate solution creates a residual, the residual creates a correction, and the correction
-        produces the next approximate solution. The method works when the residual equation is solved accurately enough that each new correction
-        removes a meaningful portion of the current error. So if a question asks what successive refinement steps are doing, the answer is that
-        each step tries to solve for the error left over from the previous one.
-      </p>
-
-      <h3>What to say when the problem asks for a verbal analysis</h3>
+      <h3>What to say on written solutions</h3>
       <ul class="bullets">
-        <li>Name the exact target and define the error quantity.</li>
-        <li>State what one iteration does to that error: halves it, multiplies it by a constant, squares it, alternates it, or amplifies it.</li>
-        <li>Say whether the behavior is local or global. Newton conclusions are usually local; bisection conclusions are global on the interval.</li>
-        <li>Distinguish true mathematical convergence from finite-precision stalling.</li>
-        <li>If the method is unstable, say what mechanism causes the instability, not just that the answer is bad.</li>
+        <li>State whether the theorem being used is local or global.</li>
+        <li>Explain the mechanism of improvement, not just the final rate word.</li>
+        <li>Distinguish exact-arithmetic theory from finite-precision behavior if both matter.</li>
+        <li>When relevant, explain why roundoff or cancellation will eventually dominate later steps.</li>
       </ul>
-
-      <h3>A compact checklist</h3>
-      <p>
-        For any iterative question, ask: what is the target, what is the current error, what formula generates the next step, what does that
-        formula do to the current error, and what pattern should appear after many repetitions? If you answer those five things clearly, you
-        usually have the full conceptual analysis the problem wants.
-      </p>
 
       <div class="divider"></div>
     </section>
@@ -721,74 +504,29 @@
     <section id="Questions" class="content">
       <h2>Questions and Answers</h2>
 
-      <h3>What is the difference between conditioning and stability?</h3>
+      <h3>Why is a small residual not the same as a small error?</h3>
       <p>
-        Conditioning belongs to the mathematical problem. It asks whether small changes in input produce small or large changes in the exact answer.
-        Stability belongs to the algorithm. It asks whether roundoff and local computational errors stay controlled or get amplified.
+        Because the residual is \(r=b-A\tilde x=A(x-\tilde x)=Ae\). If \(A^{-1}\) has large norm, then even a small residual can correspond to a much larger true solution error.
       </p>
 
-      <h3>Why can a tiny residual still be misleading?</h3>
+      <h3>Why does Newton become so fast near a good root?</h3>
       <p>
-        Because \(r=b-A\tilde x = Ae\). If \(A^{-1}\) is large in norm, then a small residual can correspond to a much larger solution error.
-        That is exactly why condition numbers matter.
+        Because for a simple root the Newton correction cancels the first-order term in the Taylor expansion, leaving the dominant error term quadratic.
       </p>
 
-      <h3>Why is bisection so dependable?</h3>
+      <h3>What is the practical meaning of a condition number?</h3>
       <p>
-        It uses only continuity and a sign change. Every step preserves an interval that still contains a root, and the interval length halves each time.
-        The method is slow, but it is very hard to break when its assumptions are satisfied.
+        It measures how much relative input error can be amplified by the mathematical problem itself. Large condition number means the exact answer is sensitive before any algorithm is even chosen.
       </p>
 
-      <h3>Why is Newton so fast near a simple root?</h3>
+      <h3>Why do interpolation theorems always emphasize distinct nodes?</h3>
       <p>
-        Because the tangent-line correction removes the first-order error term. What remains is second-order, which is why the new error is proportional
-        to the square of the old one.
+        Distinct nodes prevent collapse of the interpolation conditions. If repeated information is desired, derivative data must be added explicitly, which is what Hermite interpolation does.
       </p>
 
-      <h3>Why can Newton fail?</h3>
+      <h3>Why are theorem hypotheses so important in numerical analysis?</h3>
       <p>
-        The derivative may vanish, the initial guess may not be in a region where the method is attracted to the desired root, or the tangent step may jump
-        into a bad region. Fast local behavior does not guarantee good global behavior.
-      </p>
-
-      <h3>Why does pivoting help?</h3>
-      <p>
-        It avoids dividing by small pivots when a larger pivot is available. That keeps the elimination multipliers smaller, which usually reduces roundoff growth.
-      </p>
-
-      <h3>What does a divided difference actually represent?</h3>
-      <p>
-        It is the next Newton coefficient. The highest-order divided difference is the leading coefficient of the interpolating polynomial over the listed nodes.
-      </p>
-
-      <h3>Why is direct polynomial form often a bad way to evaluate interpolation formulas?</h3>
-      <p>
-        Because direct expansion is expensive and can be numerically awkward. Newton form plus nested evaluation is usually cleaner computationally.
-      </p>
-
-      <h3>What should I do when a formula contains subtraction of nearly equal terms?</h3>
-      <p>
-        Stop and reformulate before plugging numbers in. Rationalize, factor, use an equivalent identity, or switch to a series expansion if the point is local behavior.
-      </p>
-
-      <h3>What should I watch in successive iterations?</h3>
-      <p>
-        Watch the size, sign, and pattern of the updates. If the error is being multiplied by an approximately constant factor less than 1, that is linear behavior.
-        If the number of correct digits starts increasing much faster, you are likely seeing quadratic or superlinear behavior. If the iterates alternate around the target,
-        the derivative of the fixed-point map may be negative. If the updates stop shrinking, the method may have stalled, reached finite-precision limits, or left the local
-        convergence regime.
-      </p>
-
-      <h3>Why do so many questions separate residual from error?</h3>
-      <p>
-        Because they measure different things. Residual asks how well the computed answer satisfies the original equation. Error asks how far the computed answer is from the exact
-        one. In a well-conditioned problem they often track each other well. In an ill-conditioned problem they can be very different, so you have to discuss both.
-      </p>
-
-      <h3>What is the main practical difference between exact arithmetic and numerical analysis?</h3>
-      <p>
-        Exact arithmetic only cares whether the algebra is correct. Numerical analysis also cares whether each stage is safe under finite precision. A derivation can be perfectly correct
-        and still be a poor computational method if it introduces cancellation, uses unstable recurrences, or magnifies data error too strongly.
+        Because a method formula can still be algebraically correct when the theorem guaranteeing its behavior does not apply. Numerical analysis is full of methods that are excellent under the right hypotheses and unreliable outside them.
       </p>
 
       <div class="divider"></div>
@@ -797,11 +535,7 @@
     <section id="AlgorithmNote" class="content">
       <h2>Algorithm Note</h2>
       <p>
-        There is also a side paper here on computing the \(\pi\)-line through a point inside a helix cylinder. It is outside the core flow of the course page,
-        but it connects nicely to fixed-point style solving and Newton iteration. The geometry is converted into a scalar equation
-        \(g_\rho(\theta)=\beta\), the relevant function is shown to be monotone so the inverse exists, and Newton’s method is then used to compute
-        the inverse with at least quadratic convergence. That is a good example of a larger geometric problem being reduced to the same local numerical tools
-        used elsewhere on this page.
+        A side paper on computing a geometric \(\pi\)-line fits naturally into this page because it reduces a geometric construction problem to a scalar nonlinear equation and then applies Newton-style local solving. The value of keeping it here is not the geometry itself, but the reminder that many larger computational problems eventually reduce to the same core numerical ideas: formulation, iteration, and local error analysis.
       </p>
 
       <div class="divider"></div>
@@ -810,10 +544,11 @@
     <footer class="footer">
       <div class="footer-inner">
         <p class="fineprint">
-          This page is organized as a reusable reference. New sections can be added later for additional lectures, algorithms, examples, and problem sets.
+          This page is organized as a reusable reference. New sections can be added later for additional lectures, algorithms, theorems, examples, and problem sets.
         </p>
       </div>
     </footer>
   </main>
+</main>
 </body>
 </html>
