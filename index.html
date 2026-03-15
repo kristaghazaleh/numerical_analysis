@@ -632,9 +632,9 @@
 
       <h3>What different iteration patterns usually mean</h3>
       <ul class="bullets">
-        <li>If \(|e_{n+1}|pprox c|e_n|\) with a nearly constant \(0&lt;c&lt;1\), expect linear convergence.</li>
-        <li>If \(|e_{n+1}|pprox c|e_n|^2\), expect quadratic convergence.</li>
-        <li>If \(|e_{n+1}|/|e_n|	o 0\) but not quadratically, expect superlinear convergence.</li>
+        <li>If \(|e_{n+1}|\approx c|e_n|\) with a nearly constant \(0&lt;c&lt;1\), expect linear convergence.</li>
+        <li>If \(|e_{n+1}|\approx c|e_n|^2\), expect quadratic convergence.</li>
+        <li>If \(|e_{n+1}|/|e_n|\to 0\) but not quadratically, expect superlinear convergence.</li>
         <li>If the sign of \(e_n\) alternates while the magnitude shrinks, the method is often converging with oscillation.</li>
         <li>If the magnitude barely shrinks, the contraction factor is probably close to 1 or the method has entered a slow regime.</li>
         <li>If updates suddenly stop improving, finite precision, cancellation, or a bad local model may have become dominant.</li>
