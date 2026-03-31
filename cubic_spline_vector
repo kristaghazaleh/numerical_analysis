@@ -1,0 +1,24 @@
+function yi = cubic_spline_vector(t, y, x)
+    [h, z] = cubic_spline_coefficients(t, y);
+
+    A = (z(2:end) - z(1:end-1)) ./ (6 * h);
+    B = z / 2;
+    C = -h .* z(2:end) / 6 - h .* z(1:end-1) / 3 ...
+        + (y(2:end) - y(1:end-1)) ./ h;
+
+    n = length(y) - 1;
+    index = ones(size(x));
+
+    for j = 1:length(x)
+        for i = 1:n - 1
+            if x(j) < t(i + 1)
+                break;
+            end
+            index(j) = index(j) + 1;
+        end
+    end
+
+    yi = y(index) + (x - t(index)) .* ...
+        (C(index) + (x - t(index)) .* ...
+        (B(index) + (x - t(index)) .* A(index)));
+end
