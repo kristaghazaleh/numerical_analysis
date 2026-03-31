@@ -1,0 +1,25 @@
+function [h, z] = cubic_spline_coefficients(t, y)
+    n = length(y) - 1;
+
+    h = t(2:end) - t(1:end-1);
+    b = 6 * (y(2:end) - y(1:end-1)) ./ h;
+
+    u = zeros(1, n);
+    v = zeros(1, n);
+
+    u(1) = 2 * (h(1) + h(2));
+    v(1) = b(2) - b(1);
+
+    for i = 2 : n - 1
+        u(i) = 2 * (h(i + 1) + h(i)) - (h(i)^2) / u(i - 1);
+        v(i) = (b(i + 1) - b(i)) - h(i) * v(i - 1) / u(i - 1);
+    end
+
+    z = zeros(1, n);
+
+    for i = n - 1 : -1 : 1
+        z(i) = (v(i) - h(i + 1) * z(i + 1)) / u(i);
+    end
+
+    z = [0 z];
+end
