@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Math 128A numerical analysis reference: convergence, floating-point arithmetic, rootfinding, linear systems, norms, conditioning, and interpolation." />
-  <meta name="keywords" content="Math 128A, numerical analysis, convergence, floating point, stability, bisection, Newton, secant, fixed point, Gaussian elimination, LU, matrix norms, conditioning, interpolation, divided differences, Hermite" />
+  <meta name="description" content="Math 128A numerical analysis reference: convergence, floating-point arithmetic, rootfinding, linear systems, interpolation, spline interpolation, numerical differentiation, numerical integration, Gaussian quadrature, and worked homework patterns." />
+  <meta name="keywords" content="Math 128A, numerical analysis, convergence, floating point, stability, bisection, Newton, secant, fixed point, Gaussian elimination, LU, matrix norms, conditioning, interpolation, divided differences, Hermite, spline interpolation, numerical differentiation, Richardson extrapolation, trapezoid rule, Simpson rule, Gaussian quadrature, Legendre polynomials" />
   <title>Math 128A — Numerical Analysis Reference</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -31,6 +31,7 @@
       <div class="byline">by Ellie Ghazaleh</div>
       <div class="meta">
         <div><span class="meta-label">Term:</span> Spring 2026</div>
+        <div><span class="meta-label">Topics:</span> convergence, floating-point arithmetic, nonlinear equations, linear systems, interpolation, splines, differentiation, integration, quadrature</div>
       </div>
     </div>
   </header>
@@ -48,6 +49,11 @@
       <a href="#Iterations">Successive Iterations</a>
       <a href="#Questions">Questions and Answers</a>
       <a href="#AlgorithmNote">Algorithm Note</a>
+      <a href="#Splines">Spline Interpolation</a>
+      <a href="#Differentiation">Numerical Differentiation</a>
+      <a href="#Integration">Numerical Integration</a>
+      <a href="#GaussianQuadrature">Gaussian Quadrature</a>
+      <a href="#HomeworkAdditions">Homework Solution Extensions</a>
     </div>
   </nav>
 
@@ -571,6 +577,523 @@
         The geometric \(\pi\)-line paper fits the course because it reduces a larger geometric construction problem to the same core numerical ingredients that appear everywhere else on this page: formulation of an equation, iterative approximation, and local error analysis. It is a reminder that many seemingly different computational problems eventually collapse to the same numerical questions about approximation, convergence, and sensitivity.
       </p>
 
+      <div class="divider"></div>
+    </section>
+
+    <section id="Splines" class="content">
+      <h2>Spline Interpolation</h2>
+      <p>
+        The new interpolation material shifts from one global polynomial to a piecewise-defined object. Given data \((x_j,y_j)\), we now seek a function \(S\) that interpolates the data, but is allowed to use a different polynomial on each subinterval. This is often better behaved than one high-degree polynomial because it respects local data while still preserving smoothness across the knots.
+      </p>
+
+      <h3>Basic definition and vocabulary</h3>
+      <p>
+        A spline of order \(k\) is a function that is a polynomial of degree at most \(k\) on each interval \([t_j,t_{j+1})\). The points \(t_0&lt;t_1&lt;\cdots&lt;t_n\) are called <strong>knots</strong>. Standard names are: order \(0\) gives constant splines, order \(1\) gives linear splines, and order \(3\) gives cubic splines. In the interpolation setting one imposes
+        \[
+          S(t_j)=f(t_j), \qquad j=0,1,\dots,n.
+        \]
+      </p>
+      <p>
+        The notes explicitly avoid quadratic splines in this unit because one cannot impose the desired smoothness condition on \(S'\) at the knots in the same robust way that works for cubics. Cubic splines are the sweet spot: they are flexible enough to fit the data and smooth enough to look visually natural.
+      </p>
+
+      <h3>Natural cubic spline conditions</h3>
+      <p>
+        A <strong>natural cubic spline</strong> is a cubic spline satisfying the interpolation conditions together with the endpoint boundary conditions
+        \[
+          S''(t_0)=0, \qquad S''(t_n)=0.
+        \]
+        These are called the natural boundary conditions. They remove the extra degrees of freedom left over after requiring piecewise cubic behavior and continuity of \(S\), \(S'\), and \(S''\) at interior knots.
+      </p>
+      <p>
+        The structural idea is to track the knot values of the second derivative. Write
+        \[
+          z_j = S''(t_j), \qquad h_j=t_{j+1}-t_j.
+        \]
+        Once the vector \(z=(z_0,\dots,z_n)^T\) is known, each cubic piece \(S_j\) on \([t_j,t_{j+1}]\) is determined.
+      </p>
+
+      <h3>Closed form on each subinterval</h3>
+      <p>
+        For the interpolating cubic spline, the notes give the formula
+        \[
+          S_j(x)= \frac{z_{j+1}}{6h_j}(x-t_j)^3 + \frac{z_j}{6h_j}(t_{j+1}-x)^3
+          + \left(\frac{y_{j+1}}{h_j}-\frac{h_j}{6}z_{j+1}\right)(x-t_j)
+          + \left(\frac{y_j}{h_j}-\frac{h_j}{6}z_j\right)(t_{j+1}-x)
+        \]
+        for \(x\in[t_j,t_{j+1}]\). This formula is worth knowing because it separates the geometry of the knot spacing, the data values, and the second-derivative data. Once \(z_j\) and \(z_{j+1}\) are known, the cubic piece is completely explicit.
+      </p>
+      <p>
+        The same section also gives a nested form that is more convenient for implementation:
+        \[
+          S_j(x)= y_j + (x-t_j)\bigl(C_j + (x-t_j)(B_j + (x-t_j)A_j)\bigr),
+        \]
+        where
+        \[
+          A_j=\frac{z_{j+1}-z_j}{6h_j}, \qquad B_j=\frac{z_j}{2},
+        \]
+        and
+        \[
+          C_j=-\frac{h_j}{6}z_{j+1}-\frac{h_j}{3}z_j + \frac{y_{j+1}-y_j}{h_j}.
+        \]
+        The nested form matters computationally because it mirrors Horner-style evaluation and reduces unnecessary arithmetic.
+      </p>
+
+      <h3>The tridiagonal system</h3>
+      <p>
+        The unknowns \(z_0,\dots,z_n\) come from a tridiagonal linear system. Define
+        \[
+          b_j = \frac{6}{h_j}(y_{j+1}-y_j), \qquad u_j=2(h_j+h_{j-1}), \qquad v_j=b_j-b_{j-1}.
+        \]
+        Then the natural spline system has the form
+        \[
+          Az=v,
+        \]
+        where the first and last rows encode \(z_0=0\) and \(z_n=0\), and each interior row has the tridiagonal pattern
+        \[
+          h_{j-1}z_{j-1}+u_j z_j + h_j z_{j+1}=v_j.
+        \]
+        This is one of the key computational reasons splines are practical: the matrix is sparse and tridiagonal, so solving for the spline coefficients is much cheaper than solving a dense system of the same size.
+      </p>
+      <p>
+        The notes also give a forward-elimination/back-substitution algorithm for this system. Conceptually, it is the same idea as the tridiagonal solver from the linear systems unit. That connection is worth keeping in mind: spline construction is not a completely separate topic. It is one more place where the linear algebra algorithms reappear.
+      </p>
+
+      <h3>Why splines are "visually pleasing"</h3>
+      <p>
+        Theoretical justification appears in the minimization theorem. If \(f\in C^2[a,b]\) and \(S\) is the natural cubic spline interpolating \(f\) at the knots, then
+        \[
+          \int_a^b (S''(x))^2\,dx \le \int_a^b (f''(x))^2\,dx.
+        \]
+        In words, among all sufficiently smooth interpolants through the same knots, the natural cubic spline minimizes the bending energy measured by the square of the second derivative. This is why it tends to oscillate less than a high-degree global polynomial and why it is often described as the smoothest or most visually natural interpolant.
+      </p>
+
+      <h3>Endpoint variants and homework extensions</h3>
+      <p>
+        Natural boundary conditions are not the only choice. Homework 7 also studies endpoint derivative conditions such as
+        \[
+          s'(0)=0, \qquad s'(n)=0.
+        \]
+        These modify the first and last equations while keeping the same tridiagonal interior structure. In the equally spaced case \(t_i=i\), the resulting coefficient matrix has diagonal entries \(2,4,\dots,4,2\) and adjacent off-diagonal entries \(1\). The homework solution emphasizes that this matrix is strictly diagonally dominant, hence invertible, so the spline is unique.
+      </p>
+      <p>
+        A good study habit here is to separate three layers. First identify which endpoint conditions are being imposed. Second write the corresponding linear system for the \(z_j\). Third use invertibility of the coefficient matrix to justify uniqueness. Most spline existence-and-uniqueness exercises follow exactly that pattern.
+      </p>
+      <div class="divider"></div>
+    </section>
+
+    <section id="Differentiation" class="content">
+      <h2>Numerical Differentiation</h2>
+      <p>
+        Numerical differentiation asks the opposite question from numerical integration. Instead of replacing a function by area data, we replace a derivative by values of the function itself. Because differentiation amplifies small perturbations, this topic is especially sensitive to truncation and roundoff, and the error constants matter.
+      </p>
+
+      <h3>Forward, backward, and central schemes</h3>
+      <p>
+        The three first-derivative formulas introduced in section 7.1 are
+        \[
+          \frac{f(x+h)-f(x)}{h} \quad \text{(forward difference)},
+        \]
+        \[
+          \frac{f(x)-f(x-h)}{h} \quad \text{(backward difference)},
+        \]
+        and
+        \[
+          \frac{f(x+h)-f(x-h)}{2h} \quad \text{(central difference)}.
+        \]
+        All three come from Taylor expansion, but they do not have the same accuracy. The first two are one-sided and first-order. The central formula is symmetric and therefore cancels the first-order term, which is why it is more accurate.
+      </p>
+
+      <h3>Error terms and orders</h3>
+      <p>
+        If \(f\in C^1\) and \(f''\) exists, then the forward-difference error has the form
+        \[
+          f'(x)-\frac{f(x+h)-f(x)}{h} = -\frac{h}{2}f''(\omega),
+        \]
+        for some \(\omega\) between \(x\) and \(x+h\). So the forward scheme has truncation error \(O(h)\). The same order holds for the backward scheme.
+      </p>
+      <p>
+        If \(f\in C^3\), then the central-difference error is
+        \[
+          f'(x)-\frac{f(x+h)-f(x-h)}{2h}= -\frac{h^2}{6}f^{(3)}(\omega),
+        \]
+        for some \(\omega\in(x-h,x+h)\). Thus the central scheme has error \(O(h^2)\). This higher order is one of the most important comparisons in the whole section.
+      </p>
+      <p>
+        Section 7.1 also gives the standard second-derivative approximation
+        \[
+          \frac{f(x+h)-2f(x)+f(x-h)}{h^2},
+        \]
+        together with the error formula
+        \[
+          f''(x)-\frac{f(x+h)-2f(x)+f(x-h)}{h^2}= -\frac{h^2}{12}f^{(4)}(\omega),
+        \]
+        which again is \(O(h^2)\).
+      </p>
+
+      <h3>Truncation error</h3>
+      <p>
+        The notes define the truncation error of a difference scheme as the exact derivative minus the finite-difference approximation. That language matters because it isolates the error caused by replacing the derivative formula itself. It is distinct from roundoff error, which comes from finite precision after the scheme has been chosen.
+      </p>
+      <p>
+        In practice, smaller \(h\) does not automatically mean better answers forever. Truncation error shrinks with \(h\), but subtractive cancellation in \(f(x+h)-f(x)\) can cause roundoff to grow. A full computational discussion therefore balances truncation and roundoff, even when the theorem in class only proves a truncation bound.
+      </p>
+
+      <h3>Differentiating the interpolation formula</h3>
+      <p>
+        Section 7.1 connects finite differences to interpolation directly. If
+        \[
+          f(x)=\sum_{j=0}^n f(x_j)\omega_j(x) + \frac{f^{(n+1)}(\varepsilon)}{(n+1)!}\prod_{k=0}^n (x-x_k),
+        \]
+        then differentiating at a node \(x_\vartheta\) gives
+        \[
+          f'(x_\vartheta)=\sum_{j=0}^n f(x_j)\omega_j'(x_\vartheta)+ \frac{f^{(n+1)}(\varepsilon)}{(n+1)!}\prod_{k\ne \vartheta}(x_\vartheta-x_k).
+        \]
+        This viewpoint explains why difference formulas are really derivative formulas for interpolation polynomials plus an explicit remainder.
+      </p>
+      <p>
+        A related corollary says that when the remainder vanishes, the derivative of the interpolating polynomial at a node is exactly the weighted sum
+        \[
+          p'(x_\vartheta)=\sum_{j=0}^n f(x_j)\omega_j'(x_\vartheta).
+        \]
+        This is a very useful conceptual bridge: numerical differentiation formulas are not arbitrary memorized quotients, but special cases of differentiating an interpolant.
+      </p>
+
+      <h3>Richardson extrapolation</h3>
+      <p>
+        One of the most important acceleration ideas in the section is Richardson extrapolation. Suppose an approximation \(\omega(h)\) satisfies
+        \[
+          f'(x)=\omega(h)+O(h^2).
+        \]
+        Then the notes prove
+        \[
+          f'(x)=\frac{4}{3}\omega(h/2)-\frac{1}{3}\omega(h)+O(h^4).
+        \]
+        The idea is to combine two second-order approximations so that the leading \(h^2\) term cancels.
+      </p>
+      <p>
+        The recursive table is written as
+        \[
+          D(n,0)=\omega(h/2^n),
+        \]
+        and
+        \[
+          D(n,k)=\frac{4^k D(n,k-1)-D(n-1,k-1)}{4^k-1}.
+        \]
+        The last diagonal entry is the most highly extrapolated value. The notes state that if enough derivatives exist, then each extra extrapolation level raises the asymptotic order. This is why Richardson is so useful: it upgrades a basic method without having to derive an entirely new stencil from scratch.
+      </p>
+      <div class="divider"></div>
+    </section>
+
+    <section id="Integration" class="content">
+      <h2>Numerical Integration</h2>
+      <p>
+        Numerical integration replaces an integral by a weighted sum of function values. In section 7.2, the main pattern is the same one seen in interpolation: derive a formula by integrating an interpolation polynomial, then compare the exact integral of \(f\) to the exact integral of that interpolant.
+      </p>
+
+      <h3>Trapezoid rule</h3>
+      <p>
+        On a single interval \([a,b]\), the trapezoid rule is
+        \[
+          T(f)=\frac{b-a}{2}\bigl(f(a)+f(b)\bigr).
+        \]
+        Geometrically, it replaces the graph of \(f\) by the secant line through the endpoints and integrates the resulting trapezoid.
+      </p>
+      <p>
+        If \(f\in C^2\), the error formula is
+        \[
+          \int_a^b f(x)\,dx - \frac{b-a}{2}\bigl(f(a)+f(b)\bigr)
+          = -\frac{1}{12}(b-a)^3 f''(\omega)
+        \]
+        for some \(\omega\in(a,b)\). So the one-panel trapezoid rule is exact for polynomials of degree at most \(1\), but not exact for all quadratics.
+      </p>
+      <p>
+        The geometry also gives a quick qualitative test. If the graph is concave up, the secant line lies above the curve and the trapezoid rule overestimates the area. If the graph is concave down, the rule underestimates. This is not a substitute for the error theorem, but it is a good sign check.
+      </p>
+
+      <h3>Simpson's rule</h3>
+      <p>
+        Simpson's rule uses three equally spaced nodes and integrates the quadratic interpolant:
+        \[
+          S(f)=\frac{b-a}{6}\left(f(a)+4f\!\left(\frac{a+b}{2}\right)+f(b)\right).
+        \]
+        Because it comes from quadratic interpolation, it is more accurate than the trapezoid rule on smooth data and is exact on a much larger polynomial class.
+      </p>
+      <p>
+        If \(f\in C^4\), the notes give
+        \[
+          \int_a^b f(x)\,dx - \frac{b-a}{6}\left(f(a)+4f\!\left(\frac{a+b}{2}\right)+f(b)\right)
+          = -\frac{1}{90}\left(\frac{b-a}{2}\right)^5 f^{(4)}(\omega)
+        \]
+        for some \(\omega\in(a,b)\). Simpson's rule is exact for all polynomials of degree at most \(3\), but not exact for every quartic.
+      </p>
+
+      <h3>Mean Value Theorem for integrals</h3>
+      <p>
+        The proof strategy in section 7.2 repeatedly uses the Mean Value Theorem for integrals: if \(u\) and \(v\) are continuous and \(v\ge 0\) on \([a,b]\), then there exists \(\omega\in[a,b]\) such that
+        \[
+          \int_a^b u(x)v(x)\,dx = u(\omega)\int_a^b v(x)\,dx.
+        \]
+        This is how the error integrals collapse to a clean derivative evaluated at some intermediate point.
+      </p>
+
+      <h3>Composite formulas</h3>
+      <p>
+        On a uniform partition \(x_j=a+jh\) with \(h=(b-a)/n\), the composite trapezoid rule is
+        \[
+          T_n=h\left(\frac12 f(x_0)+f(x_1)+\cdots+f(x_{n-1})+\frac12 f(x_n)\right),
+        \]
+        and the composite Simpson rule, for even \(n\), is
+        \[
+          S_n=\frac{h}{3}\Bigl(f(x_0)+4f(x_1)+2f(x_2)+\cdots+4f(x_{n-1})+f(x_n)\Bigr).
+        \]
+        The alternating \(4,2,4,2,\dots,4\) pattern in Simpson's rule is worth memorizing carefully, because small bookkeeping mistakes there are extremely common.
+      </p>
+      <p>
+        The composite error theorems are
+        \[
+          \int_a^b f(x)\,dx - T_n = -\frac{1}{12}(b-a)h^2 f''(\omega)=O(h^2)
+        \]
+        when \(f\in C^2\), and
+        \[
+          \int_a^b f(x)\,dx - S_n = -\frac{1}{180}(b-a)h^4 f^{(4)}(\omega)=O(h^4)
+        \]
+        when \(f\in C^4\) and \(n\) is even. These are some of the cleanest order statements in the course. Composite Simpson improves the order from \(2\) to \(4\), provided the function is smooth enough.
+      </p>
+
+      <h3>What exactness really means</h3>
+      <p>
+        A quadrature rule is <strong>exact</strong> on a class of functions if it reproduces the true integral of every function in that class. The trapezoid rule is exact on linear polynomials because it integrates the line joining the endpoints, which is the function itself when \(f\) is linear. Simpson's rule is exact up through cubics even though it is derived from a quadratic interpolant. That extra exactness is one of the reasons Simpson's rule is so effective.
+      </p>
+      <div class="divider"></div>
+    </section>
+
+    <section id="GaussianQuadrature" class="content">
+      <h2>Gaussian Quadrature</h2>
+      <p>
+        Gaussian quadrature asks a sharper question than the composite rules: if only a small number of function values may be used, where should the nodes be placed and what weights should be chosen so that the degree of exactness is as large as possible? Section 7.3 answers this on \([-1,1]\) by choosing the nodes very carefully instead of spacing them uniformly.
+      </p>
+
+      <h3>General form and the cardinal functions</h3>
+      <p>
+        One seeks an approximation of the form
+        \[
+          \int_{-1}^{1} f(x)\,dx \approx \sum_{j=0}^n A_j f(x_j).
+        \]
+        If the nodes \(x_0,\dots,x_n\) are fixed, the weights are given by integrating the Lagrange cardinal functions:
+        \[
+          A_j=\int_{-1}^{1} \omega_j(x)\,dx,
+        \]
+        where
+        \[
+          \omega_j(x)=\prod_{k\ne j}\frac{x-x_k}{x_j-x_k}.
+        \]
+        For every polynomial \(q\) of degree at most \(n\), this gives the exact identity
+        \[
+          \int_{-1}^{1} q(x)\,dx = \sum_{j=0}^n A_j q(x_j).
+        \]
+      </p>
+      <p>
+        The real gain appears when the nodes are not arbitrary. If they are chosen as the roots of a polynomial \(q\) of degree \(n+1\) that is orthogonal to \(1,x,\dots,x^n\) on \([-1,1]\), then the resulting quadrature becomes exact for every polynomial of degree at most \(2n+1\). This is the Gaussian quadrature theorem.
+      </p>
+
+      <h3>Why the degree of exactness jumps to \(2n+1\)</h3>
+      <p>
+        The proof idea is elegant. If \(p\) has degree at most \(2n+1\), divide by the orthogonal polynomial \(q\) to write
+        \[
+          p=qm+r,
+        \]
+        where both \(m\) and \(r\) have degree at most \(n\). Orthogonality makes the integral of \(qm\) disappear, so
+        \[
+          \int_{-1}^{1} p(x)\,dx = \int_{-1}^{1} r(x)\,dx.
+        \]
+        Since \(r\) has degree at most \(n\), the Lagrange-weight formula integrates it exactly. At each Gaussian node \(x_j\), the factor \(q(x_j)=0\), so \(p(x_j)=r(x_j)\). That is why the final weighted sum recovers the exact integral of \(p\).
+      </p>
+
+      <h3>Legendre polynomials and Gaussian nodes</h3>
+      <p>
+        In this section the relevant orthogonal polynomials are the Legendre polynomials. They satisfy
+        \[
+          q_0(x)=1, \qquad q_1(x)=x, \qquad q_2(x)=\frac32 x^2-\frac12,
+        \]
+        and the recurrence
+        \[
+          q_n(x)=\frac{2n-1}{n}xq_{n-1}(x)-\frac{n-1}{n}q_{n-2}(x).
+        \]
+        The notes state that the roots of \(q_n\) are simple, lie in \((-1,1)\), and generate the Gaussian nodes of order \(n\).
+      </p>
+      <p>
+        The first useful cases are worth memorizing:
+        \[
+          n=1: \quad x_0=-\frac{1}{\sqrt 3}, \; x_1=\frac{1}{\sqrt 3}, \qquad A_0=A_1=1,
+        \]
+        and
+        \[
+          n=2: \quad x_0=-\sqrt{\frac35}, \; x_1=0, \; x_2=\sqrt{\frac35},
+          \qquad A_0=A_2=\frac59, \; A_1=\frac89.
+        \]
+        These formulas appear constantly in worked examples.
+      </p>
+
+      <h3>Positivity and normalization of the weights</h3>
+      <p>
+        The Gaussian coefficients are all positive and satisfy
+        \[
+          \sum_{j=0}^n A_j = \int_{-1}^{1} 1\,dx = 2.
+        \]
+        This is a small statement with a lot of practical value. Positivity means the rule behaves like a genuine weighted average rather than a cancellation-prone oscillatory formula, and the normalization check gives an immediate way to test whether a computed set of weights is plausible.
+      </p>
+
+      <h3>Changing intervals</h3>
+      <p>
+        Gaussian quadrature is derived on \([-1,1]\), but the notes explain how to move to a general interval \([a,b]\) by the change of variables
+        \[
+          x=\frac{b+a+t(b-a)}{2}.
+        \]
+        Then
+        \[
+          \int_a^b f(x)\,dx = \frac{b-a}{2}\int_{-1}^{1} f\!\left(\frac{b+a+t(b-a)}{2}\right)dt.
+        \]
+        So in practice one transforms the integrand, evaluates it at the Gaussian nodes \(t=x_j\), multiplies by the weights, and finally multiplies by \((b-a)/2\).
+      </p>
+
+      <h3>Convergence and comparison to Simpson</h3>
+      <p>
+        Using the Weierstrass approximation theorem, the notes prove that Gaussian quadrature converges for every continuous function on \([-1,1]\): as the order increases,
+        \[
+          \int_{-1}^{1} f(x)\,dx - \sum_{j=0}^n A_j f(x_j) \to 0.
+        \]
+        This is a very different style of result from the composite trapezoid and composite Simpson theorems. For those methods, the error is expressed as \(O(h^2)\) or \(O(h^4)\) in terms of a mesh size \(h\). For Gaussian quadrature, there is no equally simple uniform-spacing parameter, so the notes explicitly warn that we do not get an easy \(O(h^k)\)-style expression.
+      </p>
+      <p>
+        The section also warns that Gaussian quadrature does <strong>not</strong> mix naturally with interpolation on uniformly spaced nodes. The strength of the method comes from choosing special nodes adapted to orthogonality, not from reusing arbitrary data that happen to be already sampled at equally spaced points.
+      </p>
+      <div class="divider"></div>
+    </section>
+
+    <section id="HomeworkAdditions" class="content">
+      <h2>Homework Solution Extensions and Worked Study Patterns</h2>
+      <p>
+        The homework sets add a second layer to the notes. The lectures give general theorems and algorithms; the homework solutions show what those ideas look like when carried all the way through an actual argument or computation. These patterns are exactly the kind that tend to reappear on quizzes, midterms, and proof-based writeups.
+      </p>
+
+      <h3>Homework 6: pivoting, conditioning, and refinement</h3>
+      <p>
+        One of the clearest lessons from Homework 6 is that pivoting is not cosmetic. In the rounded elimination example, solving without pivoting produced an \(\ell_1\)-error of about \(0.0329\), while using partial pivoting reduced it to about \(0.0087\). The conceptual takeaway is simple: pivoting keeps multipliers smaller, and that usually controls the spread of roundoff through the elimination process.
+      </p>
+      <p>
+        The scaled partial pivoting problem reinforces the same point from a slightly different angle. There the correct pivot decisions are based on ratios of candidate pivots to row scales, not raw entry size alone. That distinction matters when one row is globally larger than another and raw comparison would be misleading.
+      </p>
+      <p>
+        Another important pattern is extracting determinants from \(PA=LU\). Once the factorization is known,
+        \[
+          \det(A)=\frac{\det(L)\det(U)}{\det(P)}.
+        \]
+        Since \(L\) is unit lower triangular, \(\det(L)=1\), and for triangular matrices the determinant is just the product of diagonal entries. That makes determinant questions after elimination much faster than recomputing from scratch.
+      </p>
+      <p>
+        Homework 6 also includes an illuminating Vandermonde-style system with entries \(a_{ij}=(i-1)^{j-1}\). The exact solution is the coordinate vector \(e_2\), but MATLAB begins to struggle for large \(n\) because the system becomes extremely ill-conditioned. This is a textbook example of the difference between a problem having a perfectly simple exact answer and the corresponding numerical system still being hard to solve accurately.
+      </p>
+      <p>
+        The residual-correction problem gives the cleanest possible version of iterative refinement. Starting from an approximate solution \(\tilde x\), compute \(r=b-A\tilde x\). Then solve \(Ay=r\) and update \(\tilde x\leftarrow \tilde x+y\). In the worked 2-by-2 example, the corrected vector solves the system exactly. The lesson is that the residual is not just a diagnostic. It can be turned into a correction equation.
+      </p>
+      <p>
+        The tridiagonal-operation-count problem is also worth remembering. Solving the system by exploiting the tridiagonal structure takes
+        \[
+          3(n-1)
+        \]
+        additions or subtractions and
+        \[
+          5n-4
+        \]
+        multiplications or divisions. This is much cheaper than pretending the matrix is dense. In numerical analysis, recognizing structure is often as important as executing the algorithm.
+      </p>
+      <p>
+        Two small norm-based examples from the same homework are also good exam patterns. First, the inequality
+        \[
+          \max_{x\in\Omega}(f(x)+g(x)) \le \max_{x\in\Omega} f(x)+\max_{x\in\Omega} g(x)
+        \]
+        is proved by bounding each term pointwise and then maximizing. Second, the matrix
+        \[
+          A=\begin{pmatrix}2^2 & 2^3 \\ 2^3 & 2^4\end{pmatrix}
+        \]
+        has \(\|A\|_\infty=47\), \(\|A^{-1}\|_\infty=47\), and therefore condition number \(2209\). A large condition number warns that small data errors can lead to large solution errors, so one should <em>not</em> expect uniformly tiny errors in finite precision.
+      </p>
+      <p>
+        The 2-norm problem for
+        \[
+          A=\begin{pmatrix}3&1\\1&3\end{pmatrix}
+        \]
+        is another helpful pattern. By parameterizing \(x\) on the unit circle or by using Lagrange multipliers, one finds \(\|A\|_2=4\). The message is that norm questions often hide an optimization problem, and sometimes a clever parameterization solves it faster than brute force algebra.
+      </p>
+
+      <h3>Homework 7: interpolation and spline practice</h3>
+      <p>
+        Homework 7 begins with concrete Newton-form exercises. One interpolant is written as
+        \[
+          p(x)=2+x-3x(x-2)+4x(x-2)(x-3),
+        \]
+        and then converted into nested form. This is a good reminder that Newton form is not just for theory. It is computationally useful and easy to update when new nodes are added.
+      </p>
+      <p>
+        Another early exercise tests whether tabulated data come from a cubic polynomial. The right strategy is not to fit all six points at once immediately. Instead, interpolate four of them with a cubic, then check whether the remaining data values agree. That is a standard uniqueness-based pattern: once a degree bound is known, a small set of data can determine the whole answer.
+      </p>
+      <p>
+        The interpolation-error problems in Homework 7 are especially important. For \(\sin(x)\) on \([0,1]\), the basic estimate
+        \[
+          |\sin(x)-p_n(x)|\le \frac{1}{(n+1)!}
+        \]
+        already shows that \(n\ge 10\) is sufficient for error below \(10^{-7}\). The homework also points out that this estimate is coarse because the product term can often be bounded more sharply. That is a good exam lesson: one should always distinguish a correct bound from a sharp bound.
+      </p>
+      <p>
+        The ODE-guided interpolation problem is a model example of how to combine analysis and approximation. For the linear interpolant on \([a,a+h]\), the error bound becomes
+        \[
+          |e_1|\le \frac{h^2}{8}(a+h)y_1.
+        \]
+        For the quadratic interpolant on \([a,a+2h]\), the bound becomes
+        \[
+          |e_2|\le \frac{\sqrt{3}h^3}{27}\bigl(y_1+(a+2h)|f'(a)|\bigr).
+        \]
+        The structure matters more than the exact constants: first write the remainder theorem, then bound the derivative term using the ODE, then optimize the node product term separately.
+      </p>
+      <p>
+        A very useful fact from the same homework is that if \(p\) is a polynomial of degree \(n\), then the divided difference
+        \[
+          p[x_0,x_1,\dots,x_{n+1}]
+        \]
+        is zero. This is immediate from the mean value theorem for divided differences because \(p^{(n+1)}\equiv 0\). It is exactly the kind of short fact that often appears as a conceptual checkpoint on exams.
+      </p>
+      <p>
+        The Newton divided-difference tables in Homework 7 also show an important practical pattern: when a new node is added, one can often recycle the old table instead of starting from nothing. That reuse is one of the main computational advantages of Newton form over a full re-derivation in Lagrange form.
+      </p>
+      <p>
+        The Hermite interpolation problem is another strong template. From the data
+        \[
+          f(0)=1, \quad f(1)=2, \quad f'(1)=-1, \quad f(3)=0, \quad f'(3)=0,
+        \]
+        the homework builds the Hermite polynomial and obtains
+        \[
+          f(2)\approx \frac{11}{18}.
+        \]
+        If \(|f^{(5)}|\le 4\), the error estimate becomes
+        \[
+          |f(2)-p(2)|\le \frac{1}{15}.
+        \]
+        The study point is that repeated nodes in the Hermite table count with multiplicity in the remainder formula.
+      </p>
+      <p>
+        Another elegant exercise asks for a polynomial \(p\) of degree at most \(n\) such that \(p(a)=f(a)\) and \(p'(j)=f'(j)\) for \(j=1,\dots,n\). The solution is to interpolate the derivative data first with a degree-\((n-1)\) polynomial \(q\), then integrate:
+        \[
+          p(x)=f(a)+\int_a^x q(t)\,dt.
+        \]
+        This is a beautiful example of reducing one interpolation problem to another by differentiation and integration.
+      </p>
+      <p>
+        The spline questions at the end of Homework 7 are also instructive because they force you to translate smoothness conditions into algebraic constraints. For instance, a proposed piecewise cubic may fail to be a natural spline because continuity of \(s\), \(s'\), and the endpoint conditions \(s''(-1)=s''(1)=0\) cannot all be satisfied simultaneously. By contrast, a different piecewise definition can be made into a cubic spline once continuity conditions and the given third-derivative condition are solved together.
+      </p>
+      <p>
+        The final homework problem proves uniqueness of a cubic spline with endpoint derivative conditions \(s'(0)=s'(n)=0\) by setting up the linear system for the second-derivative data and observing diagonal dominance. That is exactly the kind of cross-topic argument this course likes: an interpolation object is proved unique by a linear algebra theorem.
+      </p>
       <div class="divider"></div>
     </section>
 
