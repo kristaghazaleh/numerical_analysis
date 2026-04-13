@@ -1,0 +1,24 @@
+function x = newtonInt(fun,x,TolX,itmax,c)
+    % we use the definition x_n+1 = x_n - f(x_n)/f'(x_n)
+    % this is equal to x_n = F(x_n)/f(x_n) where F(x_n) is the integral of f(x_n) - c 
+    for i = 1:itmax
+        Fx = integral(fun,0,x) - c
+        dFx = fun(x)
+        if dFx == 0
+            error('ZeroDerivative')
+        end
+        x_new = x - Fx/dFx
+        if x~=0
+            err = abs((x_new - x)/x)
+        else
+            err = abs(x_new - x)
+        end
+        if err < TolX
+            x = x_new
+            return
+        end
+        x = x_new
+       end
+       error('IterationLimitExceeded')
+    end
+        
