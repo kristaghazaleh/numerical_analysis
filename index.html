@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Math 128A numerical analysis reference: convergence, floating-point arithmetic, rootfinding, linear systems, interpolation, spline interpolation, numerical differentiation, numerical integration, Gaussian quadrature, and worked homework patterns." />
-  <meta name="keywords" content="Math 128A, numerical analysis, convergence, floating point, stability, bisection, Newton, secant, fixed point, Gaussian elimination, LU, matrix norms, conditioning, interpolation, divided differences, Hermite, spline interpolation, numerical differentiation, Richardson extrapolation, trapezoid rule, Simpson rule, Gaussian quadrature, Legendre polynomials" />
+  <meta name="description" content="Math 128A numerical analysis reference: convergence, floating-point arithmetic, rootfinding, linear systems, interpolation, spline interpolation, numerical differentiation, numerical integration, Romberg integration, adaptive quadrature, ODE methods, Taylor-series methods, Gaussian quadrature, and worked homework patterns." />
+  <meta name="keywords" content="Math 128A, numerical analysis, convergence, floating point, stability, bisection, Newton, secant, fixed point, Gaussian elimination, LU, matrix norms, conditioning, interpolation, divided differences, Hermite, spline interpolation, numerical differentiation, Richardson extrapolation, trapezoid rule, Simpson rule, Romberg integration, adaptive quadrature, ordinary differential equations, initial value problems, slope fields, Euler method, midpoint method, Taylor series methods, Gaussian quadrature, Legendre polynomials" />
   <title>Math 128A — Numerical Analysis Reference</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -31,7 +31,7 @@
       <div class="byline">by Ellie Ghazaleh</div>
       <div class="meta">
         <div><span class="meta-label">Term:</span> Spring 2026</div>
-        <div><span class="meta-label">Topics:</span> convergence, floating-point arithmetic, nonlinear equations, linear systems, interpolation, splines, differentiation, integration, quadrature</div>
+        <div><span class="meta-label">Topics:</span> convergence, floating-point arithmetic, nonlinear equations, linear systems, interpolation, splines, differentiation, integration, Romberg, adaptive quadrature, ODEs, Taylor-series methods, quadrature</div>
       </div>
     </div>
   </header>
@@ -52,7 +52,12 @@
       <a href="#Splines">Spline Interpolation</a>
       <a href="#Differentiation">Numerical Differentiation</a>
       <a href="#Integration">Numerical Integration</a>
+      <a href="#RombergIntegration">Romberg Integration</a>
+      <a href="#AdaptiveQuadrature">Adaptive Quadrature</a>
       <a href="#GaussianQuadrature">Gaussian Quadrature</a>
+      <a href="#ODEProblems">Initial-Value Problems</a>
+      <a href="#EulerMethods">Euler and Midpoint Methods</a>
+      <a href="#TaylorSeriesMethods">Taylor-Series Methods</a>
       <a href="#HomeworkAdditions">Homework Solution Extensions</a>
     </div>
   </nav>
@@ -967,6 +972,321 @@
       </p>
       <p>
         The section also warns that Gaussian quadrature does <strong>not</strong> mix naturally with interpolation on uniformly spaced nodes. The strength of the method comes from choosing special nodes adapted to orthogonality, not from reusing arbitrary data that happen to be already sampled at equally spaced points.
+      </p>
+      <div class="divider"></div>
+    </section>
+
+
+    <section id="RombergIntegration" class="content">
+      <h2>Romberg Integration</h2>
+      <p>
+        Romberg integration improves the composite trapezoid rule by combining two ideas: first, reuse old trapezoid data when the mesh is refined, and second, apply Richardson extrapolation to cancel the leading error term. The goal is to get a much more accurate approximation of
+        \[
+          I=\int_a^b f(x)\,dx
+        \]
+        without repeatedly rebuilding everything from scratch.
+      </p>
+
+      <h3>Recursive trapezoid rule</h3>
+      <p>
+        Let
+        \[
+          R(n,0)=T_{2^n},
+        \]
+        where \(T_{2^n}\) is the composite trapezoid-rule approximation with \(2^n\) subintervals. If
+        \[
+          h_n=\frac{b-a}{2^n},
+        \]
+        then the recursive formula from the notes is
+        \[
+          R(0,0)=\frac{b-a}{2}\bigl(f(a)+f(b)\bigr),
+        \]
+        and for \(n\ge 1\),
+        \[
+          R(n,0)=\frac12 R(n-1,0)+h_n\sum_{j=1}^{2^{n-1}} f\bigl(a+(2j-1)h_n\bigr).
+        \]
+        This formula is important because it shows exactly which new function values must be added when the mesh is halved: only the odd-indexed midpoint samples are new.
+      </p>
+      <p>
+        On \([0,1]\), the first few steps make the pattern concrete:
+        \[
+          T_2=\frac12 T_1+\frac12 f\!\left(\frac12\right),
+        \]
+        \[
+          T_4=\frac12 T_2+\frac14\left(f\!\left(\frac14\right)+f\!\left(\frac34\right)\right),
+        \]
+        \[
+          T_8=\frac12 T_4+\frac18\left(f\!\left(\frac18\right)+f\!\left(\frac38\right)+f\!\left(\frac58\right)+f\!\left(\frac78\right)\right).
+        \]
+        The algorithm therefore refines the mesh efficiently instead of restarting at every level.
+      </p>
+
+      <h3>Richardson extrapolation inside the Romberg table</h3>
+      <p>
+        Once the first column \(R(n,0)\) has been computed, the higher columns are defined by
+        \[
+          R(n,m)=R(n,m-1)+\frac{R(n,m-1)-R(n-1,m-1)}{4^m-1},
+          \qquad 1\le m\le n.
+        \]
+        The denominator \(4^m-1\) appears because the composite trapezoid rule has an error expansion in even powers of \(h\). Each extrapolation step cancels one more leading term in that expansion, so the diagonal entries of the Romberg table are progressively more accurate than the raw trapezoid approximations.
+      </p>
+      <p>
+        The conceptual pattern is the same one used earlier in differentiation: if two approximations have the same leading error term but at different step sizes, then an appropriate linear combination can remove that leading term. Romberg integration simply packages that cancellation into a triangular table of values.
+      </p>
+
+      <h3>How to use Romberg in practice</h3>
+      <p>
+        A good way to work a Romberg problem by hand is to proceed in columns. First compute \(R(0,0),R(1,0),\dots,R(M,0)\) using the recursive trapezoid rule. Then compute \(R(1,1)\), then \(R(2,1)\) and \(R(2,2)\), and continue until the desired diagonal value is reached. The entry \(R(n,n)\) is usually the best approximation available at depth \(n\), because it has undergone the most extrapolation.
+      </p>
+      <div class="divider"></div>
+    </section>
+
+    <section id="AdaptiveQuadrature" class="content">
+      <h2>Adaptive Quadrature</h2>
+      <p>
+        Uniform meshes are simple, but they can waste evaluations on regions where the integrand is already easy and undersample regions where the integrand bends sharply. Adaptive quadrature fixes this by deciding where to refine based on an error estimate. In the lecture notes, the method is built from Simpson's rule rather than the trapezoid rule.
+      </p>
+
+      <h3>Basic setup with Simpson's rule</h3>
+      <p>
+        On an interval \([u,v]\), Simpson's rule gives an approximation
+        \[
+          S(u,v)\approx \int_u^v f(x)\,dx.
+        \]
+        If \(w=(u+v)/2\), then applying Simpson's rule separately on the two half-intervals gives
+        \[
+          S(u,w)+S(w,v).
+        \]
+        The single-panel approximation \(S(u,v)\) and the two-panel approximation \(S(u,w)+S(w,v)\) have related error terms, and that relation can be exploited with Richardson extrapolation.
+      </p>
+      <p>
+        Under the usual assumption that the fourth derivative is approximately constant across the interval, the notes derive the corrected approximation
+        \[
+          \int_u^v f(x)\,dx
+          \approx
+          S(u,w)+S(w,v)+\frac{1}{15}\Bigl(S(u,w)+S(w,v)-S(u,v)\Bigr).
+        \]
+        The term
+        \[
+          \frac{1}{15}\Bigl(S(u,w)+S(w,v)-S(u,v)\Bigr)
+        \]
+        is used as an estimate of the Simpson error on \([u,v]\). This is the adaptive analogue of the Romberg correction term.
+      </p>
+
+      <h3>Acceptance test and refinement logic</h3>
+      <p>
+        The adaptive idea is simple: compute \(S(u,v)\), compute the two half-interval values \(S(u,w)\) and \(S(w,v)\), and compare them. If
+        \[
+          \left|S(u,w)+S(w,v)-S(u,v)\right|
+        \]
+        is sufficiently small relative to the prescribed tolerance, accept the corrected value
+        \[
+          S(u,w)+S(w,v)+\frac{1}{15}\Bigl(S(u,w)+S(w,v)-S(u,v)\Bigr).
+        \]
+        Otherwise, subdivide again and repeat the same procedure on \([u,w]\) and \([w,v]\) separately.
+      </p>
+      <p>
+        This explains why adaptive quadrature places more nodes where the function is difficult. Smooth parts of the interval quickly pass the acceptance test, while highly curved or rapidly changing parts are subdivided further. The method is therefore not just a formula; it is a refinement strategy driven by a local error estimate.
+      </p>
+
+      <h3>Implementation viewpoint</h3>
+      <p>
+        The notes give both an iterative stack-based description and a recursive description. In either version, one saves function values that have already been computed so they are not evaluated again unnecessarily. This bookkeeping is part of what makes the method efficient. The real computational advantage of adaptive quadrature is not merely the correction term; it is the combination of local error control and data reuse.
+      </p>
+      <div class="divider"></div>
+    </section>
+
+    <section id="ODEProblems" class="content">
+      <h2>Initial-Value Problems for Ordinary Differential Equations</h2>
+      <p>
+        The new model problem in the ODE unit is the initial-value problem
+        \[
+          x'(t)=f(t,x),
+          \qquad
+          x(t_0)=x_0.
+        \]
+        Here the unknown is not a number but a function. The numerical question is to approximate the value of the solution at later times, such as \(x(t_0+h)\), \(x(t_0+2h)\), and so on.
+      </p>
+
+      <h3>Slope fields</h3>
+      <p>
+        A <strong>slope field</strong> for
+        \[
+          x'(t)=f(t,x)
+        \]
+        is obtained by plotting, at each point \((t,x)\), a short line segment with slope \(f(t,x)\). This gives a geometric picture of the differential equation before one solves it exactly. A solution curve must be tangent to the local line segments, so the slope field is the geometric backdrop for Euler's method and the midpoint method. In the lecture example
+        \[
+          x'(t)=tx+t^3,
+          \qquad x(0)=1,
+        \]
+        the slope field shows immediately how different initial values lead to different trajectories even though the same differential equation is being followed.
+      </p>
+
+      <h3>Exact solution example</h3>
+      <p>
+        The notes begin the section by solving
+        \[
+          x'(t)=tx+t^3,
+          \qquad x(0)=1,
+        \]
+        exactly with an integrating factor. Writing the equation as
+        \[
+          x'(t)-tx=t^3,
+        \]
+        an integrating factor is
+        \[
+          \mu(t)=e^{-t^2/2}.
+        \]
+        After multiplying through and integrating, the specific solution is
+        \[
+          x(t)=-t^2-2+3e^{t^2/2}.
+        \]
+        This exact answer is useful because it lets one compare later numerical approximations against a known solution.
+      </p>
+
+      <h3>Existence and uniqueness</h3>
+      <p>
+        The section also introduces the foundational theorems that justify numerical methods. If \(f\) is continuous on a rectangle
+        \[
+          A=\{(t,x): |t-t_0|\le \omega,\ |x-x_0|\le \varepsilon\},
+        \]
+        then there exists at least one solution of the initial-value problem on a time interval of length controlled by the bound
+        \[
+          M=\max_{(t,x)\in A}|f(t,x)|.
+        \]
+        More precisely, the solution exists for
+        \[
+          |t-t_0|\le \min\!\left(\omega,\frac{\varepsilon}{M}\right).
+        \]
+      </p>
+      <p>
+        If, in addition, \(f_x\) is continuous on the same rectangle, then the solution is unique on that interval. A more general uniqueness condition used in the notes is the <strong>Lipschitz condition</strong> in the \(x\)-variable: if there exists \(L\ge 0\) such that
+        \[
+          |f(t,x_1)-f(t,x_2)|\le L|x_1-x_2|
+        \]
+        for all relevant \(t,x_1,x_2\), then the initial-value problem has a unique solution. This is the theorem-level reason one is allowed to speak of <em>the</em> solution curve passing through \((t_0,x_0)\).
+      </p>
+      <div class="divider"></div>
+    </section>
+
+    <section id="EulerMethods" class="content">
+      <h2>Euler's Method, Richardson Improvement, and the Midpoint Method</h2>
+      <p>
+        Numerical ODE methods begin by approximating the exact identity
+        \[
+          x(t+h)=x(t)+\int_t^{t+h} f(s,x(s))\,ds.
+        \]
+        If one replaces the integral by a left-endpoint rule, then the first approximation is
+        \[
+          x(t+h)\approx x(t)+h f(t,x(t)).
+        \]
+        This is the same conceptual move as in numerical integration: replace an exact integral by a simple quadrature formula.
+      </p>
+
+      <h3>Forward Euler method</h3>
+      <p>
+        The <strong>Forward Euler Method</strong> is defined by
+        \[
+          x_{k+1}=x_k+h f(t_k,x_k),
+          \qquad t_k=t_0+kh.
+        \]
+        In words, one follows the slope field from the current point using the slope at the left endpoint of the time step. The method is explicit and easy to compute, but it uses only one slope evaluation per step and so it is only a first-order method.
+      </p>
+      <p>
+        The notes emphasize the geometry: starting from \((t_k,x_k)\), the method moves horizontally by \(h\) and vertically by \(h f(t_k,x_k)\). This makes Euler's method a direct numerical path-tracing procedure through the slope field.
+      </p>
+
+      <h3>Richardson improvement for a first-order method</h3>
+      <p>
+        If one Euler step of length \(h\) is compared to two Euler steps of length \(h/2\), then the two approximations have the same leading first-order error term. Richardson's idea is to combine them so that this leading term cancels. The notes use this observation to motivate a better slope choice without having to compute analytic derivatives of \(f\).
+      </p>
+
+      <h3>Modified Euler method / midpoint formula</h3>
+      <p>
+        The resulting method is the <strong>Modified Euler Method</strong>, also called the <strong>Midpoint Formula</strong>:
+        \[
+          x_{k+1}=x_k+h f\!\left(t_k+\frac{h}{2},x_k+\frac{h}{2}f(t_k,x_k)\right).
+        \]
+        It works in two stages. First estimate the midpoint value by
+        \[
+          x_{k+1/2}=x_k+\frac{h}{2}f(t_k,x_k).
+        \]
+        Then evaluate the slope at that midpoint and use it for the full step. This uses two slope evaluations per step, but it tracks the local curvature of the solution much better than Forward Euler.
+      </p>
+      <p>
+        The practical lesson is that Forward Euler uses the slope at the beginning of the interval, while the midpoint method uses a slope sampled closer to the center of the interval. That is why the midpoint method usually produces a noticeably better approximation on the same mesh.
+      </p>
+      <div class="divider"></div>
+    </section>
+
+    <section id="TaylorSeriesMethods" class="content">
+      <h2>Taylor-Series Methods for ODEs</h2>
+      <p>
+        Taylor-series methods approximate the solution of an initial-value problem by expanding the exact solution in powers of \(h\). If \(x\) is smooth and satisfies
+        \[
+          x'(t)=f(t,x),
+        \]
+        then the \(n\)th-order Taylor method is based on
+        \[
+          x(t+h)=x(t)+h x'(t)+\frac{h^2}{2}x''(t)+\cdots+\frac{h^n}{n!}x^{(n)}(t).
+        \]
+        Since \(x'(t)=f(t,x)\), the method can be written in terms of \(f\) and its total derivatives along the solution curve:
+        \[
+          x(t+h)=x(t)+h f(t,x)+\frac{h^2}{2}\frac{d}{dt}f(t,x)+\cdots+\frac{h^n}{n!}\frac{d^{n-1}}{dt^{n-1}}f(t,x).
+        \]
+      </p>
+
+      <h3>Why the derivatives must be computed carefully</h3>
+      <p>
+        A major warning from the notes is that one must not differentiate \(f(t,x)\) as if \(x\) were independent of \(t\). For example, if
+        \[
+          x'(t)=tx+t^3,
+        \]
+        then
+        \[
+          x''(t)=\frac{d}{dt}(tx+t^3)=x+t x'(t)+3t^2,
+        \]
+        not merely \(x+3t^2\). The extra term appears because \(x\) itself depends on \(t\). This is a chain-rule issue, not a minor notation point.
+      </p>
+
+      <h3>Local truncation error</h3>
+      <p>
+        If the exact solution value \(x(t_0+h)\) is approximated by \(x_1\), then the <strong>local truncation error</strong> is
+        \[
+          x(t_0+h)-x_1.
+        \]
+        The theorem in the notes states that an \(n\)th-order Taylor approximation has local truncation error of size
+        \[
+          O(h^{n+1}).
+        \]
+        This is the direct Taylor-remainder statement and is one of the cleanest error results in the ODE unit.
+      </p>
+      <p>
+        In particular, the first-order Taylor approximation
+        \[
+          x(t+h)\approx x(t)+h f(t,x)
+        \]
+        is exactly Euler's method, so its local truncation error is \(O(h^2)\). Adding the second derivative term produces a second-order Taylor method with local truncation error \(O(h^3)\).
+      </p>
+
+      <h3>Taylor's theorem in two variables</h3>
+      <p>
+        The section also states Taylor's theorem for a smooth function \(f(x,y)\) of two variables. For increments \((h,k)\), one expands
+        \[
+          f(x+h,y+k)
+        \]
+        using powers of the differential operator
+        \[
+          h\frac{\partial}{\partial x}+k\frac{\partial}{\partial y}.
+        \]
+        At second order, this produces terms involving
+        \[
+          f_x,\quad f_y,\quad f_{xx},\quad f_{xy},\quad f_{yy},
+        \]
+        together with an explicit remainder term. In the lecture, this two-variable expansion is used to compare the midpoint method against the second-order Taylor method and to explain why midpoint captures the same leading behavior without requiring analytic derivatives of \(f\).
+      </p>
+      <p>
+        This is the key tradeoff of Taylor methods: they offer a very transparent error theory and can be made arbitrarily high order in principle, but every increase in order requires more analytic derivative information. That drawback is exactly what motivates multistage methods that estimate higher-order behavior by sampling the slope field at several nearby points instead.
       </p>
       <div class="divider"></div>
     </section>
