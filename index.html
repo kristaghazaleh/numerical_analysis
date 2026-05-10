@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Math 128A numerical analysis reference: convergence, floating-point arithmetic, rootfinding, linear systems, interpolation, spline interpolation, numerical differentiation, numerical integration, Romberg integration, adaptive quadrature, ODE methods, Taylor-series methods, Gaussian quadrature, and worked homework patterns." />
-  <meta name="keywords" content="Math 128A, numerical analysis, convergence, floating point, stability, bisection, Newton, secant, fixed point, Gaussian elimination, LU, matrix norms, conditioning, interpolation, divided differences, Hermite, spline interpolation, numerical differentiation, Richardson extrapolation, trapezoid rule, Simpson rule, Romberg integration, adaptive quadrature, ordinary differential equations, initial value problems, slope fields, Euler method, midpoint method, Taylor series methods, Gaussian quadrature, Legendre polynomials" />
+  <meta name="description" content="Math 128A numerical analysis reference: convergence, floating-point arithmetic, rootfinding, linear systems, interpolation, spline interpolation, numerical differentiation, numerical integration, Romberg integration, adaptive quadrature, ODE methods, Taylor-series methods, Runge-Kutta methods, multistep methods, Gaussian quadrature, and worked homework patterns." />
+  <meta name="keywords" content="Math 128A, numerical analysis, convergence, floating point, stability, bisection, Newton, secant, fixed point, Gaussian elimination, LU, matrix norms, conditioning, interpolation, divided differences, Hermite, spline interpolation, numerical differentiation, Richardson extrapolation, trapezoid rule, Simpson rule, Romberg integration, adaptive quadrature, ordinary differential equations, initial value problems, slope fields, Euler method, midpoint method, Taylor series methods, Runge-Kutta methods, RK4, adaptive Runge-Kutta, Runge-Kutta-Fehlberg, multistep methods, Adams-Bashforth, Adams-Moulton, predictor-corrector, Gaussian quadrature, Legendre polynomials" />
   <title>Math 128A — Numerical Analysis Reference</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -31,7 +31,7 @@
       <div class="byline">by Ellie Ghazaleh</div>
       <div class="meta">
         <div><span class="meta-label">Term:</span> Spring 2026</div>
-        <div><span class="meta-label">Topics:</span> convergence, floating-point arithmetic, nonlinear equations, linear systems, interpolation, splines, differentiation, integration, Romberg, adaptive quadrature, ODEs, Taylor-series methods, quadrature</div>
+        <div><span class="meta-label">Topics:</span> convergence, floating-point arithmetic, nonlinear equations, linear systems, interpolation, splines, differentiation, integration, Romberg, adaptive quadrature, ODEs, Taylor-series methods, Runge-Kutta, multistep methods, quadrature</div>
       </div>
     </div>
   </header>
@@ -58,6 +58,8 @@
       <a href="#ODEProblems">Initial-Value Problems</a>
       <a href="#EulerMethods">Euler and Midpoint Methods</a>
       <a href="#TaylorSeriesMethods">Taylor-Series Methods</a>
+      <a href="#RungeKuttaMethods">Runge-Kutta Methods</a>
+      <a href="#MultistepMethods">Multistep Methods</a>
       <a href="#HomeworkAdditions">Homework Solution Extensions</a>
     </div>
   </nav>
@@ -1287,6 +1289,329 @@
       </p>
       <p>
         This is the key tradeoff of Taylor methods: they offer a very transparent error theory and can be made arbitrarily high order in principle, but every increase in order requires more analytic derivative information. That drawback is exactly what motivates multistage methods that estimate higher-order behavior by sampling the slope field at several nearby points instead.
+      </p>
+      <div class="divider"></div>
+    </section>
+
+
+    <section id="RungeKuttaMethods" class="content">
+      <h2>Runge-Kutta Methods</h2>
+      <p>
+        Runge-Kutta methods are the next step after Taylor-series methods. Taylor methods get higher accuracy by differentiating the differential equation repeatedly, which can become algebraically annoying very quickly. Runge-Kutta methods try to get the same higher-order behavior by evaluating the slope function at several carefully chosen points near the current point. The guiding idea is: instead of computing many analytic derivatives of \(f\), sample \(f\) at smart intermediate locations and combine those sampled slopes with the right weights.
+      </p>
+      <p>
+        The initial-value problem still has the same form,
+        \[
+          x'(t)=f(t,x), \qquad x(t_0)=x_0.
+        \]
+        Starting from an approximation \(x\approx x(t)\), a Runge-Kutta method advances to an approximation of \(x(t+h)\). The step size is \(h\), and the method computes one or more slope-like quantities before updating \(x\). In this section the important thing is not just memorizing formulas. It is understanding what each slope evaluation is trying to approximate.
+      </p>
+
+      <h3>General second-order Runge-Kutta form</h3>
+      <p>
+        A two-stage second-order Runge-Kutta method has the form
+        \[
+          x(t+h)\approx x(t)+w_1F_1+w_2F_2,
+        \]
+        where
+        \[
+          F_1=h f(t,x),
+          \qquad
+          F_2=h f(t+\alpha h, x+\beta F_1).
+        \]
+        The constants are chosen so that the Runge-Kutta update matches the Taylor expansion of the exact solution through the correct order. The conditions are
+        \[
+          w_1+w_2=1,
+          \qquad
+          \alpha w_2=\frac12,
+          \qquad
+          \beta w_2=\frac12.
+        \]
+        These equations are not random. They come from expanding \(f(t+\alpha h,x+\beta F_1)\) in two variables and matching the terms in the exact expansion of \(x(t+h)\). When those terms match, the local truncation error becomes third order, so the method is called second order.
+      </p>
+      <p>
+        This is the Runge-Kutta replacement for the second-order Taylor method. Taylor's method would require the total derivative
+        \[
+          \frac{d}{dt}f(t,x(t))=f_t(t,x)+f_x(t,x)x'(t)=f_t(t,x)+f_x(t,x)f(t,x).
+        \]
+        Runge-Kutta methods avoid writing this derivative explicitly. They sample the slope function at a nearby point instead, and the constants are chosen so that the sampled slope carries the same leading information.
+      </p>
+
+      <h3>Midpoint method as a Runge-Kutta method</h3>
+      <p>
+        The midpoint method is obtained by choosing
+        \[
+          w_1=0,
+          \qquad
+          w_2=1,
+          \qquad
+          \alpha=\beta=\frac12.
+        \]
+        Then
+        \[
+          F_1=h f(t,x),
+          \qquad
+          F_2=h f\left(t+\frac h2, x+\frac{F_1}{2}\right),
+        \]
+        and the update is
+        \[
+          x(t+h)\approx x(t)+F_2.
+        \]
+        In words, first take an Euler-style half-step to estimate where the solution is at the middle of the interval. Then evaluate the slope at that estimated midpoint and use that slope for the whole interval.
+      </p>
+      <p>
+        When \(x'(t)=f(t,x)=g(t)\) depends only on \(t\), the midpoint method becomes the ordinary midpoint rule for integration:
+        \[
+          x(t+h)\approx x(t)+h g\left(t+\frac h2\right).
+        \]
+        This connection is useful because it shows that ODE methods are often quadrature rules applied to the identity
+        \[
+          x(t+h)-x(t)=\int_t^{t+h} f(s,x(s))\,ds.
+        \]
+      </p>
+
+      <h3>Heun's method, or the explicit trapezoid method</h3>
+      <p>
+        Heun's method is another second-order Runge-Kutta method. It uses
+        \[
+          w_1=w_2=\frac12,
+          \qquad
+          \alpha=\beta=1.
+        \]
+        Thus
+        \[
+          F_1=h f(t,x),
+          \qquad
+          F_2=h f(t+h,x+F_1),
+        \]
+        and
+        \[
+          x(t+h)\approx x(t)+\frac12(F_1+F_2).
+        \]
+        The first slope \(F_1\) is the slope at the beginning of the interval. The second slope \(F_2\) is evaluated at an Euler-predicted endpoint. The final update averages those two slopes. That is why the method is also called the explicit trapezoid method: it imitates the trapezoid rule without actually solving an implicit equation for the true endpoint value.
+      </p>
+      <p>
+        When \(f(t,x)=g(t)\), Heun's method reduces to the ordinary trapezoid rule,
+        \[
+          x(t+h)\approx x(t)+\frac h2\bigl(g(t)+g(t+h)\bigr).
+        \]
+        This is the same pattern as before: if the differential equation no longer depends on \(x\), the ODE method collapses to a familiar numerical integration rule.
+      </p>
+
+      <h3>General explicit Runge-Kutta methods</h3>
+      <p>
+        An \(n\)-stage Runge-Kutta method has the form
+        \[
+          x(t+h)\approx x(t)+\sum_{j=1}^n a_jF_j,
+        \]
+        where each \(F_j\) is a slope sample near \((t,x(t))\). The method is <strong>explicit</strong> if \(F_j\) only depends on information already computed, meaning it may depend on \(F_1,\dots,F_{j-1}\), but not on future stages \(F_{j+1},\dots,F_n\). This matters computationally because an explicit method can be run by direct substitution stage by stage.
+      </p>
+      <p>
+        The <strong>order</strong> of a Runge-Kutta method is defined through its local truncation error. If one step has local truncation error of size
+        \[
+          O(h^{p+1}),
+        \]
+        then the method has order \(p\). A useful warning from the notes is that the number of stages does not automatically equal the order. An \(n\)-stage method can have order less than \(n\), and the coefficients must be chosen carefully to reach the desired order.
+      </p>
+
+      <h3>Classic fourth-order Runge-Kutta method</h3>
+      <p>
+        The classic fourth-order Runge-Kutta method, usually called RK4, is the most important formula to recognize. It computes four stage values:
+        \[
+          F_1=h f(t,x),
+        \]
+        \[
+          F_2=h f\left(t+\frac h2, x+\frac{F_1}{2}\right),
+        \]
+        \[
+          F_3=h f\left(t+\frac h2, x+\frac{F_2}{2}\right),
+        \]
+        \[
+          F_4=h f(t+h,x+F_3),
+        \]
+        and then updates by
+        \[
+          x(t+h)\approx x(t)+\frac16(F_1+2F_2+2F_3+F_4).
+        \]
+        The weights say that the two middle slope estimates matter twice as much as the beginning and endpoint estimates. The method is fourth order, so its local truncation error is \(O(h^5)\).
+      </p>
+      <p>
+        Conceptually, RK4 is taking a weighted average of four slope samples: one at the start, two near the middle, and one near the end. This is why it is usually much more accurate than Euler or midpoint at the same step size. The cost is that each step requires four evaluations of \(f\), so a fair experiment comparing Euler, midpoint, and RK4 should pay attention to both step size and the number of function evaluations. Comparing methods at the same \(h\) is simple, but not always computationally fair, because RK4 spends more work per step.
+      </p>
+
+      <h3>Error estimation by comparing one full step to two half steps</h3>
+      <p>
+        To decide whether a step size is small enough, one can compare two approximations to the same endpoint. Let \(u\) be the result of taking one Runge-Kutta step of size \(h\), and let \(v\) be the result of taking two steps of size \(h/2\). If the method has order \(p\), then the local error behaves like a constant times \(h^{p+1}\). The difference between \(u\) and \(v\) can therefore be used as an estimate of the local truncation error.
+      </p>
+      <p>
+        The notes derive this with a Richardson-extrapolation style argument. The important practical consequence is: if \(|v-u|\) is small enough, the step size is acceptable; if it is too large, the step size should be reduced and the step recomputed. The drawback is cost. An \(n\)-stage method already evaluates \(f\) at \(n\) positions for one step, and using two half-steps forces extra evaluations.
+      </p>
+
+      <h3>Embedded Runge-Kutta pairs and adaptive step size</h3>
+      <p>
+        An embedded pair improves the error-estimation idea by using two related Runge-Kutta formulas that share the same stage values. In an embedded pair one computes the same \(F_j\)'s, but forms two different weighted sums:
+        \[
+          x(t+h)\approx x(t)+\sum_{j=1}^n a_jF_j,
+          \qquad
+          \widehat{x}(t+h)\approx x(t)+\sum_{j=1}^n b_jF_j.
+        \]
+        Since the stages are shared, the difference
+        \[
+          e=\sum_{j=1}^n(a_j-b_j)F_j
+        \]
+        gives an error estimate without recomputing the whole step by a second method. This is the main computational advantage of embedded pairs.
+      </p>
+      <p>
+        If the embedded pair has orders \(p\) and \(p+1\), then the two approximations are close when the step is safe and far apart when the step is too large. A basic adaptive rule is: if \(|e|>\vartheta\), reject the step and retry with a smaller \(h\); if \(|e|\) is far below the tolerance, increase \(h\) for the next step. The lecture notes use safety factors because doubling \(h\) can dramatically increase the local truncation error, especially for higher-order methods.
+      </p>
+      <p>
+        The Runge-Kutta-Fehlberg method is a famous embedded method. It uses a fifth-order approximation for the solution and a fourth-order approximation for estimating the error. In practice, this lets the algorithm automatically spend small steps where the solution is changing quickly and larger steps where the solution is smooth. The study takeaway is direct: adaptive Runge-Kutta methods are not a different kind of ODE problem; they are Runge-Kutta methods plus a local error estimate and a rule for changing \(h\).
+      </p>
+
+      <h3>How to use Runge-Kutta methods in exam problems</h3>
+      <p>
+        For a computation problem, write down every stage explicitly before updating \(x\). Most mistakes come from using the wrong intermediate \(t\)-value or forgetting that \(F_j\) already includes the factor of \(h\). For a theory question, identify the order through local truncation error and explain how the method was designed to match Taylor expansion terms. For an adaptive-step question, focus on the error estimate \(e\), the tolerance \(\vartheta\), and whether the algorithm should accept, reject, halve, or double the step.
+      </p>
+      <div class="divider"></div>
+    </section>
+
+    <section id="MultistepMethods" class="content">
+      <h2>Multistep Methods</h2>
+      <p>
+        Multistep methods use information from previous time levels instead of collecting several brand-new slope evaluations inside one step. This is the main contrast with Runge-Kutta. A Runge-Kutta method starts from the current point and samples \(f\) several times nearby. A multistep method remembers old values \(x_n,x_{n-1},\dots\) and old slopes \(f_n,f_{n-1},\dots\), then combines them to predict the next value.
+      </p>
+      <p>
+        The standard notation is
+        \[
+          t_n=t_0+nh,
+          \qquad
+          x_n\approx x(t_n),
+          \qquad
+          f_n=f(t_n,x_n).
+        \]
+        This notation is essential because multistep formulas are built out of several previous indices. A one-step method only needs the current value. A two-step method needs the current value and one previous value. A \(k\)-step method needs enough starting values before its recurrence can actually begin.
+      </p>
+
+      <h3>Second-order Adams-Bashforth method</h3>
+      <p>
+        The second-order Adams-Bashforth method is
+        \[
+          x_{n+1}=x_n+\frac32h f_n-\frac12h f_{n-1}.
+        \]
+        Equivalently,
+        \[
+          x_{n+1}=x_n+h\left(\frac32 f_n-\frac12 f_{n-1}\right).
+        \]
+        This is an explicit two-step method because the right-hand side only uses known information from time levels \(n\) and \(n-1\). Once \(x_{n-1}\) and \(x_n\) are known, the next value \(x_{n+1}\) is computed directly.
+      </p>
+      <p>
+        The practical advantage is that after the method has started, each new step only needs one new function evaluation. The value \(f_{n-1}\) was already computed during the previous step, so it can be reused. This is the main efficiency reason multistep methods are attractive. By comparison, a two-stage Runge-Kutta method uses two slope evaluations each step, and RK4 uses four.
+      </p>
+
+      <h3>Why Adams-Bashforth has those coefficients</h3>
+      <p>
+        The formula comes from integrating the differential equation over one interval:
+        \[
+          x(t_{n+1})-x(t_n)=\int_{t_n}^{t_{n+1}} f(s,x(s))\,ds.
+        \]
+        The Adams-Bashforth idea is to approximate the integrand \(f(s,x(s))\) using old slope data, then integrate that approximating polynomial. For AB2, one uses a linear extrapolating polynomial through \((t_{n-1},f_{n-1})\) and \((t_n,f_n)\), then integrates it over \([t_n,t_{n+1}]\). That calculation produces the coefficients \(3/2\) and \(-1/2\).
+      </p>
+      <p>
+        This is why the method uses a negative coefficient on \(f_{n-1}\). The formula is not averaging two old slopes inside the interval. It is extrapolating the slope forward from old information. The extrapolation is exact for polynomials of degree at most one in \(t\), which is why the method is second order rather than first order.
+      </p>
+
+      <h3>Startup values</h3>
+      <p>
+        A two-step method cannot start from \(x_0\) alone. The AB2 formula needs both \(x_0\) and \(x_1\), because it uses \(f_0\) and \(f_1\). Therefore \(x_1\) must be generated by another method, usually a one-step method such as Euler, midpoint, Heun, or RK4. This is not a side issue; it is part of using a multistep method correctly.
+      </p>
+      <p>
+        On an exam, if a problem gives only \(x_0\) and asks for AB2, check whether it also tells you how to obtain \(x_1\). If not, you should say that a starting method is needed. If the problem gives \(x_0\) and \(x_1\), then AB2 can begin immediately.
+      </p>
+
+      <h3>Implicit trapezoid method and Adams-Moulton</h3>
+      <p>
+        The implicit trapezoid method, also called the second-order Adams-Moulton method, is
+        \[
+          x_{n+1}=x_n+\frac12 h f_{n+1}+\frac12 h f_n.
+        \]
+        The word <strong>implicit</strong> matters because
+        \[
+          f_{n+1}=f(t_{n+1},x_{n+1}),
+        \]
+        and \(x_{n+1}\) is exactly the unknown being solved for. So unlike explicit Adams-Bashforth, the new value appears on both sides of the equation.
+      </p>
+      <p>
+        If \(f\) depends on \(x\), this formula usually requires solving an equation for \(x_{n+1}\). This extra work can be worth it because implicit methods often have better stability behavior. If \(f\) depends only on \(t\), then the method reduces to the ordinary trapezoid rule for integration.
+      </p>
+
+      <h3>Predictor-corrector method</h3>
+      <p>
+        A predictor-corrector method uses an explicit method first to predict the unknown endpoint, then plugs that prediction into an implicit-style correction. In the notes, the predictor is AB2:
+        \[
+          p_{n+1}=x_n+\frac32 h f_n-\frac12 h f_{n-1}.
+        \]
+        Then the corrector uses the trapezoid/Adams-Moulton idea, but evaluates the new slope at the predicted value:
+        \[
+          x_{n+1}=x_n+\frac12 h f(t_{n+1},p_{n+1})+\frac12 h f_n.
+        \]
+        This gives a second-order predictor-corrector method.
+      </p>
+      <p>
+        The logic is simple. Adams-Bashforth gives a direct estimate of where the endpoint should be. That estimated endpoint gives an approximate value for \(f_{n+1}\). Then the trapezoid-style average of the old slope and predicted new slope gives the corrected value. This avoids solving the fully implicit equation while still using information from the endpoint.
+      </p>
+
+      <h3>General Adams-Bashforth formulas</h3>
+      <p>
+        A general Adams-Bashforth formula has the structure
+        \[
+          x_{n+1}=x_n+a f_n+b f_{n-1}+c f_{n-2}+\cdots,
+        \]
+        with coefficients chosen so that the numerical integration formula is exact for polynomials up to a desired degree. More precisely, the coefficients are chosen to approximate
+        \[
+          \int_{t_n}^{t_{n+1}} f(s,x(s))\,ds
+        \]
+        by integrating an interpolating or extrapolating polynomial built from previous slope values.
+      </p>
+      <p>
+        This is the same mathematical philosophy as quadrature. The method replaces the unknown continuous integrand with a polynomial model that is exact on enough test polynomials. The more old slope values are used, the higher the possible order, but also the more history the method needs and the more delicate stability can become.
+      </p>
+
+      <h3>Linear multistep methods</h3>
+      <p>
+        A general linear \(k\)-step method has the form
+        \[
+          a_kx_n+a_{k-1}x_{n-1}+\cdots+a_0x_{n-k}
+          =h\bigl(b_kf_n+b_{k-1}f_{n-1}+\cdots+b_0f_{n-k}\bigr),
+        \]
+        where \(a_k\neq 0\). The method is <strong>explicit</strong> if the coefficient multiplying the newest slope is zero, and <strong>implicit</strong> otherwise. In this indexing, the newest slope term is the one involving \(f_n\). If that term appears, then the formula involves the newest unknown value through \(f(t_n,x_n)\), so an equation must be solved.
+      </p>
+      <p>
+        The AB2 formula is a two-step explicit method. Written in standard shifted form, it uses \(x_n\), \(x_{n-1}\), \(f_n\), and \(f_{n-1}\) to compute the next value. The implicit trapezoid method is a one-step implicit method, because it only connects the current and next time levels but includes the new slope. This distinction between step count and order is important: a method can be one-step or two-step independently of whether it is first-order, second-order, or higher-order.
+      </p>
+
+      <h3>Order of a multistep method</h3>
+      <p>
+        The notes define a linear functional associated with a multistep method:
+        \[
+          Lx=\sum_{j=0}^k\left(a_jx(jh)-h b_jx'(jh)\right).
+        \]
+        Expanding this functional in powers of \(h\) produces coefficients \(d_0,d_1,d_2,\dots\). The theorem states that the following are equivalent: the coefficients \(d_0,d_1,\dots,d_m\) vanish, the functional gives zero on every polynomial of degree at most \(m\), and \(Lx=O(h^{m+1})\) for sufficiently smooth \(x\). In that case, the multistep method is declared to have order \(m\).
+      </p>
+      <p>
+        This theorem is the multistep version of the same accuracy idea seen in interpolation and quadrature: a method has higher order when it is exact on more low-degree polynomial test functions. The lecture checks AB2 this way and finds that it is second order. The warning is the same as for Runge-Kutta: a \(k\)-step method need not have order \(k\). Step count measures how much history the method uses, not automatically how accurate it is.
+      </p>
+
+      <h3>Runge-Kutta versus multistep methods</h3>
+      <p>
+        Runge-Kutta methods and multistep methods spend computational work differently. A \(k\)-stage Runge-Kutta method usually needs \(k\) evaluations of \(f\) to move one step forward. A \(k\)-step multistep method usually needs only one new evaluation of \(f\) per step after the starting values are available, because older slope values are reused. This can make multistep methods efficient for long integrations.
+      </p>
+      <p>
+        The tradeoff is that multistep methods need history and startup values, and their behavior depends on how old information is carried forward. Runge-Kutta methods are self-starting: one current value is enough to take the next step. Multistep methods are memory-based: they are cheaper per step after startup, but they require careful initialization and can have more complicated stability behavior.
+      </p>
+
+      <h3>How to use multistep methods in exam problems</h3>
+      <p>
+        First write the indexing carefully. Identify which values are already known and which value is being computed. Second decide whether the method is explicit or implicit by checking whether the newest slope depends on the unknown new value. Third check whether enough starting values have been supplied. Finally, for order questions, connect the method to polynomial exactness or the vanishing coefficients in the linear functional expansion. That is the clean way to avoid mixing up step count, order, explicitness, and local truncation error.
       </p>
       <div class="divider"></div>
     </section>
